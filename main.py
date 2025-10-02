@@ -6,7 +6,6 @@ import numpy as np
 
 # =============================================================================
 # SORT (Simple Online and Realtime Tracking) Algorithm
-# I've included the SORT tracker code directly in this file to keep it simple.
 # This code is based on the original implementation by Alex Bewley.
 # =============================================================================
 
@@ -61,12 +60,12 @@ class KalmanBoxTracker(object):
         x = bbox[0] + w/2.
         y = bbox[1] + h/2.
         s = w * h
-        r = w / float(h)
+        r = w / float(h) if h != 0 else 0
         return np.array([x, y, s, r]).reshape((4, 1))
 
     def convert_x_to_bbox(self, x, score=None):
-        w = np.sqrt(x[2] * x[3])
-        h = x[2] / w
+        w = np.sqrt(x[2] * x[3]) if (x[2] * x[3]) >= 0 else 0
+        h = x[2] / w if w != 0 else 0
         if(score==None):
             return np.array([x[0]-w/2.,x[1]-h/2.,x[0]+w/2.,x[1]+h/2.]).reshape((1,4))
         else:
@@ -171,120 +170,96 @@ class Sort(object):
 # Main Application
 # =============================================================================
 
-# --- Initialize Flask App ---
 app = Flask(__name__)
-
-# --- Load Your Custom Model ---
-# Make sure 'best.pt' is in the same folder as this script
 model = YOLO('runs/detect/train/weights/best.pt')
 
-# --- Video Capture ---
 cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-cap.set(cv.CAP_PROP_FRAME_HEIGHT, 720)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
-
-# --- Global Variables for Tracking and Counting ---
 tracker = Sort(max_age=20, min_hits=3, iou_threshold=0.3)
 track_history = {}
 thaal_out_count = 0
 thaal_in_count = 0
-tray_out_count = 0
-tray_in_count = 0
+# Placeholder for tray counts
+# tray_out_count = 0
+# tray_in_count = 0
 
-# --- Define the Virtual Line ---
-# This is a vertical line in the middle of the screen. Adjust if needed.
-LINE_START = (640, 0)
-LINE_END = (640, 720)
+FRAME_WIDTH = 1280
+FRAME_HEIGHT = 720
+LINE_POSITION = FRAME_WIDTH // 2 # Center line
 
-# --- Threading Setup ---
+LINE_START = (400, 0)
+LINE_END = (400, FRAME_HEIGHT)
+
 lock = threading.Lock()
 global_frame = None
 
 def camera_and_cv_thread():
-    """Main thread to read frames, run detection, tracking, and counting."""
-    global global_frame, lock
-    global thaal_out_count, thaal_in_count, tray_out_count, tray_in_count
+    global global_frame, lock, thaal_out_count, thaal_in_count
 
     while True:
         success, frame = cap.read()
         if not success:
             break
 
-        # Run YOLO detection
-        results = model(frame, stream=True)
-
-        detections = np.empty((0, 5))
-
+        results = model.track(frame, persist=True)
+        
+        detections_list = []
         for r in results:
             boxes = r.boxes
             for box in boxes:
                 x1, y1, x2, y2 = box.xyxy[0]
-                x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
                 conf = float(box.conf[0])
                 cls = int(box.cls[0])
-                
-                # Filter low-confidence detections
                 if conf > 0.5:
-                    current_detection = np.array([x1, y1, x2, y2, conf, cls])
-                    detections = np.vstack((detections, current_detection[:,:5]))
+                    detections_list.append([int(x1), int(y1), int(x2), int(y2), conf])
+
+        if len(detections_list) > 0:
+            detections_np = np.array(detections_list)
+            tracked_objects = tracker.update(detections_np)
+        else:
+            tracked_objects = tracker.update(np.empty((0, 5)))
 
 
-        # Update the tracker
-        tracked_objects = tracker.update(detections)
-
-        # Draw the virtual line on the frame
         cv2.line(frame, LINE_START, LINE_END, (0, 255, 0), 2)
 
-        # Process tracked objects
         for obj in tracked_objects:
             x1, y1, x2, y2, obj_id = obj
             x1, y1, x2, y2, obj_id = int(x1), int(y1), int(x2), int(y2), int(obj_id)
             
-            # Get the center of the bounding box
             center_x = (x1 + x2) // 2
-            center_y = (y1 + y2) // 2
 
-            # Store the history of the object's center point
             if obj_id not in track_history:
                 track_history[obj_id] = []
             track_history[obj_id].append(center_x)
 
-            # Check for line crossing
             if len(track_history[obj_id]) > 1:
                 prev_x = track_history[obj_id][-2]
                 
-                # If it crosses from left to right (outgoing)
-                if prev_x < LINE_START[0] and center_x >= LINE_START[0]:
-                    # This is where you would differentiate based on class if you had multiple classes
-                    thaal_in_count += 1
-                
-                # If it crosses from right to left (incoming)
-                elif prev_x > LINE_START[0] and center_x <= LINE_START[0]:
+                if prev_x < LINE_POSITION and center_x >= LINE_POSITION:
                     thaal_out_count += 1
+                
+                elif prev_x > LINE_POSITION and center_x <= LINE_POSITION:
+                    thaal_in_count += 1
 
-
-            # Draw bounding box and ID
             cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
             cv2.putText(frame, f"ID: {obj_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
 
-        # Draw the counts on the screen
-        cv2.putText(frame, f"Thaal Out: {thaal_out_count}", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-        cv2.putText(frame, f"Thaal In: {thaal_in_count}", (50, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-        # Add tray counts later if needed
+        cv2.putText(frame, f"Thaal Out: {thaal_out_count}", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
+        cv2.putText(frame, f"Thaal In: {thaal_in_count}", (50, 110), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
 
         with lock:
             global_frame = frame.copy()
 
 def generate_frames():
-    """Generator for streaming the processed frames."""
     global global_frame, lock
     while True:
         with lock:
             if global_frame is None:
                 continue
             
-            stream_frame = cv2.resize(global_frame, (640, 360))
+            stream_frame = cv2.resize(global_frame, (960, 540)) # Resize for streaming
             (flag, encoded_image) = cv2.imencode('.jpg', stream_frame)
             if not flag:
                 continue
@@ -292,7 +267,6 @@ def generate_frames():
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encoded_image) + b'\r\n')
 
-# --- Flask Web Routes ---
 @app.route('/')
 def index():
     return render_template('main.html')
@@ -301,9 +275,9 @@ def index():
 def video_feed():
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-# --- Main Execution ---
 if __name__ == '__main__':
     thread = threading.Thread(target=camera_and_cv_thread)
     thread.daemon = True
     thread.start()
     app.run(host='0.0.0.0', port=5001, debug=False)
+
