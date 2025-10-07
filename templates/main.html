@@ -41,10 +41,11 @@
             color: white;
             box-shadow: 0 4px 10px rgba(0,0,0,0.2);
             transition: background-color 0.3s;
-            text-decoration: none; /* For 'a' tags styled as buttons */
+            text-decoration: none;
             display: inline-block;
         }
         .btn-start { background-color: #27ae60; }
+        .btn-stop { background-color: #c0392b; }
         .btn-dashboard { background-color: #8e44ad; }
         .btn:disabled {
             background-color: #7f8c8d;
@@ -61,26 +62,45 @@
 
     <div class="controls">
         <button id="start-btn" class="btn btn-start" onclick="startService()">Start Service</button>
+        <button id="stop-btn" class="btn btn-stop" onclick="stopService()">Stop Service</button>
         <a href="/dashboard" class="btn btn-dashboard">View Dashboard</a>
     </div>
 
     <script>
         const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
 
-        function sendCommand(endpoint) {
-            fetch(endpoint, { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    console.log(data.status);
-                    updateStatus();
-                })
-                .catch(error => console.error('Error:', error));
+        function sendCommand(endpoint, data = {}) {
+            fetch(endpoint, { 
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data.status);
+                updateStatus();
+            })
+            .catch(error => console.error('Error:', error));
         }
 
-        function startService() { 
-            // Optional: Ask for confirmation before starting a new service
-            if (confirm('Are you sure you want to start a new service? This will reset any previous counts if the service was not stopped.')) {
-                sendCommand('/start_service');
+        function startService() {
+            const expected = prompt("Optional: Enter the expected number of thaals for this service:", "");
+            if (expected === null) {
+                return;
+            }
+            if (expected.trim() !== "" && !/^\d+$/.test(expected)) {
+                alert("Please enter a valid number for expected thaals.");
+                return;
+            }
+            sendCommand('/start_service', { expected_thaals: expected });
+        }
+
+        function stopService() {
+            if (confirm('Are you sure you want to stop the service? This will finalize the session and reset counts.')) {
+                sendCommand('/stop_service');
             }
         }
 
@@ -88,16 +108,18 @@
             fetch('/status')
                 .then(response => response.json())
                 .then(data => {
-                    // If service is active, disable the start button.
-                    // If it's inactive, enable it.
-                    startBtn.disabled = data.service_active;
+                    if (data.service_active) {
+                        startBtn.disabled = true;
+                        stopBtn.disabled = false;
+                    } else {
+                        startBtn.disabled = false;
+                        stopBtn.disabled = true;
+                    }
                 })
                 .catch(error => console.error('Error fetching status:', error));
         }
 
-        // Initial status update when the page loads
         document.addEventListener('DOMContentLoaded', updateStatus);
-        // Periodically update status every 5 seconds
         setInterval(updateStatus, 5000);
     </script>
 </body>

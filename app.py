@@ -5,24 +5,19 @@ import csv
 import cv2
 from datetime import datetime
 
-# Import the other layers of our application
 from vision_processor import VisionProcessor
 import database
 
-# --- Main Application Setup ---
 app = Flask(__name__)
-# Create a single instance of our vision processor
 vision_processor = VisionProcessor()
 
 def generate_frames():
     """Generator function to yield frames for the MJPEG stream."""
     while True:
-        # Get the latest frame from the vision processor
         frame = vision_processor.get_frame()
         if frame is None:
             continue
         
-        # Resize frame for a smoother streaming experience
         stream_frame = cv2.resize(frame, (960, 540))
         (flag, encoded_image) = cv2.imencode('.jpg', stream_frame)
         if not flag:
@@ -31,7 +26,7 @@ def generate_frames():
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encoded_image) + b'\r\n')
 
-# --- Flask Web Routes ---
+# --- Main Control Routes ---
 @app.route('/')
 def index():
     return render_template('main.html')
@@ -42,7 +37,17 @@ def video_feed():
 
 @app.route('/start_service', methods=['POST'])
 def start_service():
-    if vision_processor.start_service():
+    """Starts a new service session, optionally with an expected count."""
+    data = request.get_json()
+    expected_thaals = data.get('expected_thaals') if data else None
+    
+    if expected_thaals:
+        try:
+            expected_thaals = int(expected_thaals)
+        except (ValueError, TypeError):
+            expected_thaals = None
+
+    if vision_processor.start_service(expected_thaals):
         return jsonify(success=True, status="Service started.")
     return jsonify(success=False, status="Service already active.")
 
@@ -52,71 +57,72 @@ def stop_service():
         return jsonify(success=True, status="Service stopped.")
     return jsonify(success=False, status="Service not active.")
 
-@app.route('/reset_counts', methods=['POST'])
-def reset_counts():
-    vision_processor.reset_counts()
-    return jsonify(success=True, status="Counts reset.")
-
 @app.route('/status')
 def status():
     return jsonify(vision_processor.get_status())
 
 # --- DASHBOARD ROUTES ---
-
 @app.route('/dashboard')
 def dashboard():
-    """Renders the main dashboard page."""
     return render_template('dashboard.html')
 
 @app.route('/api/dashboard_data')
 def dashboard_data():
-    """API endpoint to fetch processed data for the dashboard."""
-    date_str = request.args.get('date')
-    if not date_str:
-        date_str = datetime.now().strftime('%Y-%m-%d')
+    date_str = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
     
     try:
         selected_date = datetime.strptime(date_str, '%Y-%m-%d').date()
     except ValueError:
         return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
 
-    session_ids = database.get_sessions_for_date(selected_date)
-    if not session_ids:
+    sessions = database.get_sessions_for_date(selected_date)
+    if not sessions:
         return jsonify({"message": "No data available for this date."})
 
+    total_out = 0
+    total_in = 0
+    total_expected = 0
+    total_duration = 0
+    session_ids = []
+
+    for session in sessions:
+        session_id, start_time, end_time, expected, final_out, final_in = session
+        session_ids.append(session_id)
+        
+        if final_out is not None: total_out += final_out
+        if final_in is not None: total_in += final_in
+        
+        # --- THIS IS THE FIX ---
+        # Check if 'expected' is a valid number before adding it.
+        if expected is not None and isinstance(expected, int):
+            total_expected += expected
+        
+        if start_time and end_time:
+            duration = datetime.fromisoformat(end_time) - datetime.fromisoformat(start_time)
+            total_duration += duration.total_seconds()
+
     all_events = []
-    for session_id in session_ids:
-        _, events = database.get_session_events(session_id)
-        if events:
-            all_events.extend(events)
+    # Fetch event logs only if needed for charts
+    if session_ids:
+        all_events = database.get_events_for_date(selected_date)
 
-    if not all_events:
-        return jsonify({"message": "No event data found for the sessions on this date."})
 
-    # Process events to calculate metrics
-    total_out = sum(1 for _, event_type in all_events if event_type == 'THAAL_OUT')
-    total_in = sum(1 for _, event_type in all_events if event_type == 'THAAL_IN')
-    
-    start_time = datetime.fromisoformat(all_events[0][0])
-    end_time = datetime.fromisoformat(all_events[-1][0])
-    duration_minutes = round((end_time - start_time).total_seconds() / 60)
-
-    # Calculate hourly throughput for the bar chart
     hourly_throughput = {}
-    for timestamp, event_type in all_events:
-        if event_type == 'THAAL_OUT':
-            hour = datetime.fromisoformat(timestamp).strftime('%H:00')
-            hourly_throughput[hour] = hourly_throughput.get(hour, 0) + 1
+    if all_events:
+        for _, timestamp, event_type, _ in all_events:
+            if event_type == 'THAAL_OUT':
+                hour = datetime.fromisoformat(timestamp).strftime('%H:00')
+                hourly_throughput[hour] = hourly_throughput.get(hour, 0) + 1
+    
     sorted_throughput = dict(sorted(hourly_throughput.items()))
-
-    # --- NEW: Calculate cumulative data for the line chart ---
     timeline_labels, cumulative_out, cumulative_in = database.get_timeseries_data(session_ids)
 
     return jsonify({
         "date": date_str,
         "total_thaals_out": total_out,
         "total_thaals_in": total_in,
-        "total_duration_minutes": duration_minutes,
+        "total_duration_minutes": round(total_duration / 60),
+        "total_expected_thaals": total_expected if total_expected > 0 else "N/A",
         "hourly_throughput": sorted_throughput,
         "timeline_labels": timeline_labels,
         "cumulative_out_data": cumulative_out,
@@ -125,7 +131,6 @@ def dashboard_data():
 
 @app.route('/export_by_date')
 def export_by_date():
-    """Exports all event data for a specific date as a CSV file."""
     date_str = request.args.get('date')
     if not date_str:
         return "Please provide a date.", 400

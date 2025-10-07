@@ -16,7 +16,7 @@ class VisionProcessor:
         # --- State Variables ---
         self.lock = threading.Lock()
         self.is_service_active = False
-        self.service_start_time = None # To track when the service started
+        self.service_start_time = None
         self.thaal_out_count = 0
         self.thaal_in_count = 0
         self.current_session_id = None
@@ -27,12 +27,12 @@ class VisionProcessor:
         self.FRAME_WIDTH = 1280
         self.FRAME_HEIGHT = 720
         self.LINE_OUT_POSITION = self.FRAME_WIDTH // 3
-        self.LINE_IN_POSITION = (self.FRAME_WIDTH // 3) * 2
-        self.LINE_OUT_START = (self.LINE_OUT_POSITION, 0)
-        self.LINE_OUT_END = (self.LINE_OUT_POSITION, self.FRAME_HEIGHT)
+        self.LINE_IN_POSITION = 750 #(self.FRAME_WIDTH // 3) * 2
+        self.LINE_OUT_START = (500, 0)
+        self.LINE_OUT_END = (250, self.FRAME_HEIGHT)
         self.LINE_IN_START = (self.LINE_IN_POSITION, 0)
         self.LINE_IN_END = (self.LINE_IN_POSITION, self.FRAME_HEIGHT)
-        self.AUTO_STOP_DURATION = timedelta(hours=3) # Auto-stop after 3 hours
+        self.AUTO_STOP_DURATION = timedelta(hours=3)
 
     def _process_frame(self):
         """Internal method to run the CV logic on a single frame."""
@@ -103,44 +103,43 @@ class VisionProcessor:
         """The main loop for the CV thread."""
         while True:
             self._process_frame()
-            # Check for auto-stop condition periodically
             self._check_auto_stop()
-            time.sleep(0.01) # Small delay to prevent tight loop
+            time.sleep(0.01)
 
     def get_frame(self):
-        """Returns the latest annotated frame for streaming."""
         with self.lock:
             return self.latest_frame
             
-    def start_service(self):
+    def start_service(self, expected_thaals=None):
         with self.lock:
             if not self.is_service_active:
                 self.is_service_active = True
-                self.service_start_time = datetime.now() # Start the timer
+                self.service_start_time = datetime.now()
                 self.thaal_out_count = 0
                 self.thaal_in_count = 0
                 self.track_history.clear()
                 self.current_session_id = f"session_{int(time.time())}"
-                database.log_event("SERVICE_START", self.current_session_id)
-                print(f"Service started with session ID: {self.current_session_id}")
+                database.create_session(self.current_session_id, expected_thaals)
+                print(f"Service started with session ID: {self.current_session_id}, Expected: {expected_thaals}")
                 return True
         return False
 
     def stop_service(self):
         with self.lock:
             if self.is_service_active:
+                # IMPORTANT: Save final counts BEFORE resetting state
+                database.update_session_summary(self.current_session_id, self.thaal_out_count, self.thaal_in_count)
+                database.end_session(self.current_session_id)
+                
                 self.is_service_active = False
-                self.service_start_time = None # Reset the timer
-                database.log_event("SERVICE_STOP", self.current_session_id)
+                self.service_start_time = None
                 print(f"Service stopped for session ID: {self.current_session_id}")
                 self.current_session_id = None
-                # Automatically reset counts after stopping
                 self.reset_counts() 
                 return True
         return False
 
     def reset_counts(self):
-        # This is now an internal helper function, but can still be called
         self.thaal_out_count = 0
         self.thaal_in_count = 0
         self.track_history.clear()
