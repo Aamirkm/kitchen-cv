@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thaal Counter Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #2c3e50; 
+            color: #ecf0f1;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: auto;
+        }
+        h1 { text-align: center; }
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 30px;
+            background-color: #34495e;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .controls input[type="date"], .controls a {
+            padding: 10px;
+            font-size: 1em;
+            border-radius: 5px;
+            border: 1px solid #7f8c8d;
+        }
+        .controls a {
+            text-decoration: none;
+            background-color: #3498db;
+            color: white;
+        }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .metric-card {
+            background-color: #34495e;
+            padding: 25px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .metric-card h2 {
+            margin: 0 0 10px;
+            color: #bdc3c7;
+            font-size: 1.2em;
+        }
+        .metric-card p {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #3498db;
+        }
+        .chart-container {
+            background-color: #34495e;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px; /* Added margin */
+        }
+        #no-data-message {
+            text-align: center;
+            font-size: 1.5em;
+            padding: 50px;
+            display: none; /* Hidden by default */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Data Dashboard</h1>
+        <div class="controls">
+            <label for="date-picker">Select Date:</label>
+            <input type="date" id="date-picker">
+            <a id="export-link" href="#">Export Day's Data (CSV)</a>
+        </div>
+        
+        <div id="dashboard-content">
+            <div class="metrics">
+                <div class="metric-card">
+                    <h2>Total Thaals Out</h2>
+                    <p id="total-out">--</p>
+                </div>
+                <div class="metric-card">
+                    <h2>Total Thaals In</h2>
+                    <p id="total-in">--</p>
+                </div>
+                <div class="metric-card">
+                    <h2>Total Service (Minutes)</h2>
+                    <p id="total-duration">--</p>
+                </div>
+            </div>
+    
+            <div class="chart-container">
+                <h3>Cumulative Flow</h3>
+                <canvas id="cumulative-chart"></canvas>
+            </div>
+
+            <div class="chart-container">
+                <h3>Throughput per Hour</h3>
+                <canvas id="throughput-chart"></canvas>
+            </div>
+        </div>
+
+        <div id="no-data-message">
+            <p>No event data found for the selected date.</p>
+        </div>
+    </div>
+
+    <script>
+        const datePicker = document.getElementById('date-picker');
+        const exportLink = document.getElementById('export-link');
+        let throughputChart;
+        let cumulativeChart; // Variable for the new line chart
+
+        function updateDashboard(data) {
+            if (data.message) {
+                document.getElementById('dashboard-content').style.display = 'none';
+                document.getElementById('no-data-message').style.display = 'block';
+            } else {
+                document.getElementById('dashboard-content').style.display = 'block';
+                document.getElementById('no-data-message').style.display = 'none';
+
+                // Update metric cards
+                document.getElementById('total-out').textContent = data.total_thaals_out;
+                document.getElementById('total-in').textContent = data.total_thaals_in;
+                document.getElementById('total-duration').textContent = data.total_duration_minutes;
+                
+                // --- Update Bar Chart (Throughput) ---
+                const throughputCtx = document.getElementById('throughput-chart').getContext('2d');
+                if (throughputChart) {
+                    throughputChart.destroy();
+                }
+                throughputChart = new Chart(throughputCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(data.hourly_throughput),
+                        datasets: [{
+                            label: 'Thaals Served Per Hour',
+                            data: Object.values(data.hourly_throughput),
+                            backgroundColor: 'rgba(52, 152, 219, 0.5)',
+                            borderColor: 'rgba(52, 152, 219, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: { /* Chart options... */ }
+                });
+
+                // --- NEW: Update Line Chart (Cumulative Flow) ---
+                const cumulativeCtx = document.getElementById('cumulative-chart').getContext('2d');
+                if (cumulativeChart) {
+                    cumulativeChart.destroy();
+                }
+                cumulativeChart = new Chart(cumulativeCtx, {
+                    type: 'line',
+                    data: {
+                        labels: data.timeline_labels,
+                        datasets: [
+                            {
+                                label: 'Cumulative Thaals Out',
+                                data: data.cumulative_out_data,
+                                borderColor: 'rgba(46, 204, 113, 1)', // Green
+                                backgroundColor: 'rgba(46, 204, 113, 0.2)',
+                                fill: true,
+                                tension: 0.1
+                            },
+                            {
+                                label: 'Cumulative Thaals In',
+                                data: data.cumulative_in_data,
+                                borderColor: 'rgba(231, 76, 60, 1)', // Red
+                                backgroundColor: 'rgba(231, 76, 60, 0.2)',
+                                fill: true,
+                                tension: 0.1
+                            }
+                        ]
+                    },
+                    options: {
+                        scales: {
+                            y: { beginAtZero: true, ticks: { color: '#ecf0f1' }},
+                            x: { ticks: { color: '#ecf0f1' }}
+                        },
+                        plugins: { legend: { labels: { color: '#ecf0f1' }}}
+                    }
+                });
+            }
+        }
+
+        function fetchDataForDate(date) {
+            fetch(`/api/dashboard_data?date=${date}`)
+                .then(response => response.json())
+                .then(data => {
+                    updateDashboard(data);
+                    exportLink.href = `/export_by_date?date=${date}`;
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date().toISOString().split('T')[0];
+            datePicker.value = today;
+            fetchDataForDate(today);
+
+            datePicker.addEventListener('change', () => {
+                fetchDataForDate(datePicker.value);
+            });
+        });
+    </script>
+</body>
+</html>
+

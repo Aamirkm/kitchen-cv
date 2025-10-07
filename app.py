@@ -1,8 +1,9 @@
-from flask import Flask, render_template, Response, jsonify, make_response
+from flask import Flask, render_template, Response, jsonify, make_response, request
 import threading
 import io
 import csv
 import cv2
+from datetime import datetime
 
 # Import the other layers of our application
 from vision_processor import VisionProcessor
@@ -60,38 +61,101 @@ def reset_counts():
 def status():
     return jsonify(vision_processor.get_status())
 
-@app.route('/export_csv')
-def export_csv():
-    """Exports the last completed session's data as a CSV file."""
-    result = database.get_last_session_events()
+# --- DASHBOARD ROUTES ---
 
-    if not result:
-        return "No completed sessions found to export.", 404
+@app.route('/dashboard')
+def dashboard():
+    """Renders the main dashboard page."""
+    return render_template('dashboard.html')
+
+@app.route('/api/dashboard_data')
+def dashboard_data():
+    """API endpoint to fetch processed data for the dashboard."""
+    date_str = request.args.get('date')
+    if not date_str:
+        date_str = datetime.now().strftime('%Y-%m-%d')
     
-    last_session_id, session_events = result
+    try:
+        selected_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
 
-    # Generate CSV in memory
+    session_ids = database.get_sessions_for_date(selected_date)
+    if not session_ids:
+        return jsonify({"message": "No data available for this date."})
+
+    all_events = []
+    for session_id in session_ids:
+        _, events = database.get_session_events(session_id)
+        if events:
+            all_events.extend(events)
+
+    if not all_events:
+        return jsonify({"message": "No event data found for the sessions on this date."})
+
+    # Process events to calculate metrics
+    total_out = sum(1 for _, event_type in all_events if event_type == 'THAAL_OUT')
+    total_in = sum(1 for _, event_type in all_events if event_type == 'THAAL_IN')
+    
+    start_time = datetime.fromisoformat(all_events[0][0])
+    end_time = datetime.fromisoformat(all_events[-1][0])
+    duration_minutes = round((end_time - start_time).total_seconds() / 60)
+
+    # Calculate hourly throughput for the bar chart
+    hourly_throughput = {}
+    for timestamp, event_type in all_events:
+        if event_type == 'THAAL_OUT':
+            hour = datetime.fromisoformat(timestamp).strftime('%H:00')
+            hourly_throughput[hour] = hourly_throughput.get(hour, 0) + 1
+    sorted_throughput = dict(sorted(hourly_throughput.items()))
+
+    # --- NEW: Calculate cumulative data for the line chart ---
+    timeline_labels, cumulative_out, cumulative_in = database.get_timeseries_data(session_ids)
+
+    return jsonify({
+        "date": date_str,
+        "total_thaals_out": total_out,
+        "total_thaals_in": total_in,
+        "total_duration_minutes": duration_minutes,
+        "hourly_throughput": sorted_throughput,
+        "timeline_labels": timeline_labels,
+        "cumulative_out_data": cumulative_out,
+        "cumulative_in_data": cumulative_in
+    })
+
+@app.route('/export_by_date')
+def export_by_date():
+    """Exports all event data for a specific date as a CSV file."""
+    date_str = request.args.get('date')
+    if not date_str:
+        return "Please provide a date.", 400
+    
+    try:
+        selected_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return "Invalid date format. Use YYYY-MM-DD.", 400
+
+    all_events = database.get_events_for_date(selected_date)
+    
+    if not all_events:
+        return "No data for the selected date.", 404
+
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(['Timestamp', 'EventType'])
-    writer.writerows(session_events)
-    
+    writer.writerow(['ID', 'Timestamp', 'EventType', 'SessionID'])
+    writer.writerows(all_events)
     output.seek(0)
     
     response = make_response(output.getvalue())
-    response.headers["Content-Disposition"] = f"attachment; filename=thaal_log_{last_session_id}.csv"
+    response.headers["Content-Disposition"] = f"attachment; filename=thaal_log_{date_str}.csv"
     response.headers["Content-type"] = "text/csv"
     
     return response
 
 if __name__ == '__main__':
-    # Initialize the database
     database.init_db()
-    
-    # Start the background thread for the vision processor
     cv_thread = threading.Thread(target=vision_processor.run)
     cv_thread.daemon = True
     cv_thread.start()
-    
-    # Start the Flask web server
     app.run(host='0.0.0.0', port=5001, debug=False)
+

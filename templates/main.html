@@ -41,11 +41,13 @@
             color: white;
             box-shadow: 0 4px 10px rgba(0,0,0,0.2);
             transition: background-color 0.3s;
+            text-decoration: none; /* For 'a' tags styled as buttons */
+            display: inline-block;
         }
         .btn-start { background-color: #27ae60; }
         .btn-stop { background-color: #c0392b; }
         .btn-reset { background-color: #f39c12; }
-        .btn-export { background-color: #3498db; text-decoration: none; display: inline-block;}
+        .btn-dashboard { background-color: #8e44ad; } /* New color for dashboard button */
         .btn:disabled {
             background-color: #7f8c8d;
             cursor: not-allowed;
@@ -63,7 +65,8 @@
         <button id="start-btn" class="btn btn-start" onclick="startService()">Start Service</button>
         <button id="stop-btn" class="btn btn-stop" onclick="stopService()">Stop Service</button>
         <button id="reset-btn" class="btn btn-reset" onclick="resetCounts()">Reset Counts</button>
-        <a href="/export_csv" id="export-btn" class="btn btn-export">Download Last Session</a>
+        <!-- NEW DASHBOARD BUTTON -->
+        <a href="/dashboard" class="btn btn-dashboard">View Dashboard</a>
     </div>
 
     <script>
