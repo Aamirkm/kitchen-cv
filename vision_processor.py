@@ -2,7 +2,8 @@ import cv2
 import threading
 from ultralytics import YOLO
 import time
-import database # Import our new data layer
+from datetime import datetime, timedelta
+import database # Import our data layer
 
 class VisionProcessor:
     def __init__(self):
@@ -13,8 +14,9 @@ class VisionProcessor:
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
         # --- State Variables ---
-        self.lock = threading.Lock() # Protects shared data
+        self.lock = threading.Lock()
         self.is_service_active = False
+        self.service_start_time = None # To track when the service started
         self.thaal_out_count = 0
         self.thaal_in_count = 0
         self.current_session_id = None
@@ -25,11 +27,12 @@ class VisionProcessor:
         self.FRAME_WIDTH = 1280
         self.FRAME_HEIGHT = 720
         self.LINE_OUT_POSITION = self.FRAME_WIDTH // 3
-        self.LINE_IN_POSITION = 750 # (self.FRAME_WIDTH // 3) * 2
-        self.LINE_OUT_START = (500, 0)
-        self.LINE_OUT_END = (250, self.FRAME_HEIGHT)
+        self.LINE_IN_POSITION = (self.FRAME_WIDTH // 3) * 2
+        self.LINE_OUT_START = (self.LINE_OUT_POSITION, 0)
+        self.LINE_OUT_END = (self.LINE_OUT_POSITION, self.FRAME_HEIGHT)
         self.LINE_IN_START = (self.LINE_IN_POSITION, 0)
         self.LINE_IN_END = (self.LINE_IN_POSITION, self.FRAME_HEIGHT)
+        self.AUTO_STOP_DURATION = timedelta(hours=3) # Auto-stop after 3 hours
 
     def _process_frame(self):
         """Internal method to run the CV logic on a single frame."""
@@ -87,10 +90,22 @@ class VisionProcessor:
         with self.lock:
             self.latest_frame = annotated_frame.copy()
 
+    def _check_auto_stop(self):
+        """Checks if the service has been running for too long and stops it."""
+        with self.lock:
+            if self.is_service_active and self.service_start_time:
+                elapsed = datetime.now() - self.service_start_time
+                if elapsed >= self.AUTO_STOP_DURATION:
+                    print(f"Auto-stopping service after {elapsed}. Session: {self.current_session_id}")
+                    self.stop_service()
+
     def run(self):
         """The main loop for the CV thread."""
         while True:
             self._process_frame()
+            # Check for auto-stop condition periodically
+            self._check_auto_stop()
+            time.sleep(0.01) # Small delay to prevent tight loop
 
     def get_frame(self):
         """Returns the latest annotated frame for streaming."""
@@ -101,6 +116,7 @@ class VisionProcessor:
         with self.lock:
             if not self.is_service_active:
                 self.is_service_active = True
+                self.service_start_time = datetime.now() # Start the timer
                 self.thaal_out_count = 0
                 self.thaal_in_count = 0
                 self.track_history.clear()
@@ -114,19 +130,22 @@ class VisionProcessor:
         with self.lock:
             if self.is_service_active:
                 self.is_service_active = False
+                self.service_start_time = None # Reset the timer
                 database.log_event("SERVICE_STOP", self.current_session_id)
                 print(f"Service stopped for session ID: {self.current_session_id}")
                 self.current_session_id = None
+                # Automatically reset counts after stopping
+                self.reset_counts() 
                 return True
         return False
 
     def reset_counts(self):
-        with self.lock:
-            self.thaal_out_count = 0
-            self.thaal_in_count = 0
-            self.track_history.clear()
-            print("Counts have been reset.")
-            return True
+        # This is now an internal helper function, but can still be called
+        self.thaal_out_count = 0
+        self.thaal_in_count = 0
+        self.track_history.clear()
+        print("Counts have been reset.")
+        return True
 
     def get_status(self):
         with self.lock:
@@ -135,3 +154,4 @@ class VisionProcessor:
                 "thaal_out": self.thaal_out_count,
                 "thaal_in": self.thaal_in_count
             }
+
