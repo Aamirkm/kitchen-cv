@@ -15,15 +15,22 @@
         }
         h1 { margin-bottom: 20px; }
         .video-container {
-            margin-bottom: 20px;
+            /* --- FIX STARTS HERE --- */
+            max-width: 960px;       /* Match the image's max-width */
+            margin: 0 auto 20px;  /* Center the container horizontally and add bottom margin */
+            /* --- END FIX --- */
+            
+            background-color: #000;
+            border-radius: 8px;
+            border: 3px solid #3498db; 
+            line-height: 0; /* Prevents extra space below the image */
         }
         img { 
-            border: 3px solid #3498db; 
-            border-radius: 8px; 
-            background-color: #000;
-            max-width: 960px; 
+            max-width: 100%; /* Image should not exceed its container */
             width: 100%;      
-            height: auto;     
+            height: auto;
+            display: block; 
+            border-radius: 5px; /* Match container rounding */
         }
         .controls {
             display: flex;
@@ -46,6 +53,7 @@
         }
         .btn-start { background-color: #27ae60; }
         .btn-stop { background-color: #c0392b; }
+        .btn-toggle-stream { background-color: #f39c12; }
         .btn-dashboard { background-color: #8e44ad; }
         .btn:disabled {
             background-color: #7f8c8d;
@@ -57,18 +65,26 @@
     <h1>Thaal Counter Control Panel</h1>
 
     <div class="video-container">
-        <img src="{{ url_for('video_feed') }}">
+        <!-- The video stream image tag -->
+        <img id="video-stream" src="{{ url_for('video_feed') }}">
     </div>
 
     <div class="controls">
         <button id="start-btn" class="btn btn-start" onclick="startService()">Start Service</button>
         <button id="stop-btn" class="btn btn-stop" onclick="stopService()">Stop Service</button>
+        <button id="toggle-stream-btn" class="btn btn-toggle-stream" onclick="toggleStream()">Hide Stream</button>
         <a href="/dashboard" class="btn btn-dashboard">View Dashboard</a>
     </div>
 
     <script>
         const startBtn = document.getElementById('start-btn');
         const stopBtn = document.getElementById('stop-btn');
+        const toggleStreamBtn = document.getElementById('toggle-stream-btn');
+        const videoStream = document.getElementById('video-stream');
+        const videoContainer = document.querySelector('.video-container');
+
+        let isStreamVisible = true;
+        const videoFeedUrl = "{{ url_for('video_feed') }}";
 
         function sendCommand(endpoint, data = {}) {
             fetch(endpoint, { 
@@ -88,9 +104,7 @@
 
         function startService() {
             const expected = prompt("Optional: Enter the expected number of thaals for this service:", "");
-            if (expected === null) {
-                return;
-            }
+            if (expected === null) { return; }
             if (expected.trim() !== "" && !/^\d+$/.test(expected)) {
                 alert("Please enter a valid number for expected thaals.");
                 return;
@@ -99,8 +113,21 @@
         }
 
         function stopService() {
-            if (confirm('Are you sure you want to stop the service? This will finalize the session and reset counts.')) {
+            if (confirm('Are you sure you want to stop the service? This will reset the counts.')) {
                 sendCommand('/stop_service');
+            }
+        }
+
+        function toggleStream() {
+            isStreamVisible = !isStreamVisible;
+            if (isStreamVisible) {
+                videoStream.src = videoFeedUrl;
+                videoContainer.style.display = 'block'; // Show container
+                toggleStreamBtn.textContent = 'Hide Stream';
+            } else {
+                videoStream.src = '#'; // This stops the browser from loading the stream
+                videoContainer.style.display = 'none'; // Hide container
+                toggleStreamBtn.textContent = 'Show Stream';
             }
         }
 
