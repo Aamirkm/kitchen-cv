@@ -15,22 +15,43 @@
         }
         h1 { margin-bottom: 20px; }
         .video-container {
-            /* --- FIX STARTS HERE --- */
-            max-width: 960px;       /* Match the image's max-width */
-            margin: 0 auto 20px;  /* Center the container horizontally and add bottom margin */
-            /* --- END FIX --- */
-            
+            max-width: 960px;
+            margin: 0 auto 20px;
             background-color: #000;
             border-radius: 8px;
             border: 3px solid #3498db; 
-            line-height: 0; /* Prevents extra space below the image */
+            line-height: 0;
         }
         img { 
-            max-width: 100%; /* Image should not exceed its container */
+            max-width: 100%;
             width: 100%;      
             height: auto;
             display: block; 
-            border-radius: 5px; /* Match container rounding */
+            border-radius: 5px;
+        }
+        /* --- NEW: Metrics Section Styling --- */
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            max-width: 960px;
+            margin: 20px auto;
+        }
+        .metric-card {
+            background-color: #34495e;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .metric-card h2 {
+            margin: 0 0 10px;
+            color: #bdc3c7;
+            font-size: 1.1em;
+        }
+        .metric-card p {
+            margin: 0;
+            font-size: 2em;
+            font-weight: bold;
+            color: #3498db;
         }
         .controls {
             display: flex;
@@ -65,8 +86,27 @@
     <h1>Thaal Counter Control Panel</h1>
 
     <div class="video-container">
-        <!-- The video stream image tag -->
         <img id="video-stream" src="{{ url_for('video_feed') }}">
+    </div>
+
+    <!-- --- NEW: Live Metrics Section --- -->
+    <div class="metrics">
+        <div class="metric-card">
+            <h2>Thaals Out</h2>
+            <p id="live-thaal-out">0</p>
+        </div>
+        <div class="metric-card">
+            <h2>Thaals In</h2>
+            <p id="live-thaal-in">0</p>
+        </div>
+        <div class="metric-card">
+            <h2>Expected</h2>
+            <p id="live-expected">N/A</p>
+        </div>
+        <div class="metric-card">
+            <h2>Service Time (Min)</h2>
+            <p id="live-duration">0</p>
+        </div>
     </div>
 
     <div class="controls">
@@ -83,15 +123,19 @@
         const videoStream = document.getElementById('video-stream');
         const videoContainer = document.querySelector('.video-container');
 
+        // --- NEW: Get references to the new metric elements ---
+        const liveThaalOut = document.getElementById('live-thaal-out');
+        const liveThaalIn = document.getElementById('live-thaal-in');
+        const liveExpected = document.getElementById('live-expected');
+        const liveDuration = document.getElementById('live-duration');
+
         let isStreamVisible = true;
         const videoFeedUrl = "{{ url_for('video_feed') }}";
 
         function sendCommand(endpoint, data = {}) {
             fetch(endpoint, { 
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             })
             .then(response => response.json())
@@ -122,11 +166,11 @@
             isStreamVisible = !isStreamVisible;
             if (isStreamVisible) {
                 videoStream.src = videoFeedUrl;
-                videoContainer.style.display = 'block'; // Show container
+                videoContainer.style.display = 'block';
                 toggleStreamBtn.textContent = 'Hide Stream';
             } else {
-                videoStream.src = '#'; // This stops the browser from loading the stream
-                videoContainer.style.display = 'none'; // Hide container
+                videoStream.src = '#';
+                videoContainer.style.display = 'none';
                 toggleStreamBtn.textContent = 'Show Stream';
             }
         }
@@ -135,6 +179,7 @@
             fetch('/status')
                 .then(response => response.json())
                 .then(data => {
+                    // Update button states
                     if (data.service_active) {
                         startBtn.disabled = true;
                         stopBtn.disabled = false;
@@ -142,6 +187,12 @@
                         startBtn.disabled = false;
                         stopBtn.disabled = true;
                     }
+                    
+                    // --- NEW: Update the live metric cards ---
+                    liveThaalOut.textContent = data.thaal_out;
+                    liveThaalIn.textContent = data.thaal_in;
+                    liveExpected.textContent = data.expected_thaals || 'N/A';
+                    liveDuration.textContent = data.service_duration_minutes;
                 })
                 .catch(error => console.error('Error fetching status:', error));
         }

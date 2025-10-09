@@ -3,7 +3,7 @@ from ultralytics import YOLO
 import threading
 import time
 from datetime import datetime
-import database  # <-- Reverted to direct import
+import database
 
 class VisionProcessor:
     """
@@ -26,6 +26,8 @@ class VisionProcessor:
         self.is_service_active = False
         self.current_session_id = None
         self.annotated_frame = None
+        self.start_time = None
+        self.expected_thaals = None
         
         # --- Constants ---
         self.FRAME_WIDTH = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -43,6 +45,8 @@ class VisionProcessor:
         self.thaal_out_count = 0
         self.thaal_in_count = 0
         self.track_history.clear()
+        self.start_time = None
+        self.expected_thaals = None
 
     def start_service(self, expected_thaals):
         """Starts a new service session."""
@@ -50,19 +54,18 @@ class VisionProcessor:
             if not self.is_service_active:
                 self._reset_counts()
                 self.is_service_active = True
-                # --- CHANGE: Use a human-readable, timestamp-based session ID ---
-                start_time = datetime.now()
-                self.current_session_id = start_time.strftime("session-%Y-%m-%d-%H%M%S")
+                self.start_time = datetime.now()
+                self.expected_thaals = expected_thaals if expected_thaals and expected_thaals.strip() != "" else "N/A"
+
+                self.current_session_id = self.start_time.strftime("session-%Y-%m-%d-%H%M%S")
                 
-                # We need to pass the start_time object to the database function
-                database.create_session(self.current_session_id, start_time, expected_thaals)
+                db_expected = int(expected_thaals) if self.expected_thaals != "N/A" else None
+                database.create_session(self.current_session_id, self.start_time, db_expected)
                 print(f"Service started with Session ID: {self.current_session_id}")
 
-                # Start the 3-hour auto-stop timer
                 if self.auto_stop_timer:
                     self.auto_stop_timer.cancel()
-                # Set timer for 3 hours (10800 seconds)
-                self.auto_stop_timer = threading.Timer(3 * 60 * 60, self.stop_service) 
+                self.auto_stop_timer = threading.Timer(10800, self.stop_service) 
                 self.auto_stop_timer.start()
 
     def stop_service(self):
@@ -74,10 +77,9 @@ class VisionProcessor:
                 database.end_session(self.current_session_id, stop_time)
                 database.update_session_summary(self.current_session_id, self.thaal_out_count, self.thaal_in_count)
                 print(f"Service stopped for Session ID: {self.current_session_id}")
-                self._reset_counts()
+                # Don't reset counts immediately, so the UI can show final numbers
                 self.current_session_id = None
                 
-                # Cancel the auto-stop timer if service is stopped manually
                 if self.auto_stop_timer:
                     self.auto_stop_timer.cancel()
                     self.auto_stop_timer = None
@@ -85,10 +87,17 @@ class VisionProcessor:
     def get_status(self):
         """Returns the current status for the web interface."""
         with self.state_lock:
+            duration_minutes = 0
+            if self.is_service_active and self.start_time:
+                duration = datetime.now() - self.start_time
+                duration_minutes = int(duration.total_seconds() // 60)
+
             return {
                 "service_active": self.is_service_active,
                 "thaal_out": self.thaal_out_count,
-                "thaal_in": self.thaal_in_count
+                "thaal_in": self.thaal_in_count,
+                "expected_thaals": self.expected_thaals,
+                "service_duration_minutes": duration_minutes
             }
 
     def get_annotated_frame(self):
@@ -105,16 +114,18 @@ class VisionProcessor:
             if not success:
                 time.sleep(0.1)
                 continue
-
-            # Only process if the service is active
+            
+            # --- CV processing happens here ---
+            processed_frame = frame.copy()
             if self.is_service_active:
-                results = self.model.track(frame, persist=True, verbose=False)
+                results = self.model.track(processed_frame, persist=True, verbose=False)
 
                 if results[0].boxes.id is not None:
                     boxes = results[0].boxes.xyxy.cpu().numpy().astype(int)
                     track_ids = results[0].boxes.id.cpu().numpy().astype(int)
 
                     for box, track_id in zip(boxes, track_ids):
+                        # ... (tracking and counting logic remains the same) ...
                         x1, y1, x2, y2 = box
                         center_x = (x1 + x2) // 2
 
@@ -127,37 +138,30 @@ class VisionProcessor:
                             prev_x = self.track_history[track_id]["positions"][-2]
 
                             if not self.track_history[track_id]["has_been_counted"]:
-                                # OUTGOING: Crosses LEFT line from RIGHT-TO-LEFT
                                 if prev_x > self.LINE_OUT_POSITION and center_x <= self.LINE_OUT_POSITION:
                                     with self.state_lock:
                                         self.thaal_out_count += 1
                                         database.log_event("THAAL_OUT", self.current_session_id)
                                     self.track_history[track_id]["has_been_counted"] = True
 
-                                # INCOMING: Crosses RIGHT line from LEFT-TO-RIGHT
                                 elif prev_x < self.LINE_IN_POSITION and center_x >= self.LINE_IN_POSITION:
                                     with self.state_lock:
                                         self.thaal_in_count += 1
                                         database.log_event("THAAL_IN", self.current_session_id)
                                     self.track_history[track_id]["has_been_counted"] = True
                 
-                # Get the annotated frame from the results
-                annotated_frame = results[0].plot()
-            else:
-                # If service is not active, just use the raw frame
-                annotated_frame = frame
+                processed_frame = results[0].plot()
             
-            # Draw lines and counts regardless of service state
-            cv2.line(annotated_frame, (self.LINE_OUT_POSITION, 0), (self.LINE_OUT_POSITION, self.FRAME_HEIGHT), (0, 255, 0), 2)
-            cv2.line(annotated_frame, (self.LINE_IN_POSITION, 0), (self.LINE_IN_POSITION, self.FRAME_HEIGHT), (0, 0, 255), 2)
-            cv2.putText(annotated_frame, f"Thaals Out: {self.thaal_out_count}", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3)
-            cv2.putText(annotated_frame, f"Thaals In: {self.thaal_in_count}", (self.FRAME_WIDTH - 300, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
+            # --- Drawing on the frame ---
+            # Draw lines regardless of service state
+            cv2.line(processed_frame, (self.LINE_OUT_POSITION, 0), (self.LINE_OUT_POSITION, self.FRAME_HEIGHT), (0, 255, 0), 2)
+            cv2.line(processed_frame, (self.LINE_IN_POSITION, 0), (self.LINE_IN_POSITION, self.FRAME_HEIGHT), (0, 0, 255), 2)
+            
+            # THE COUNT TEXT IS NO LONGER DRAWN HERE
 
-            # Update the global annotated frame
             with self.frame_lock:
-                self.annotated_frame = annotated_frame
+                self.annotated_frame = processed_frame
 
-            # Small delay to prevent this thread from hogging 100% CPU
             time.sleep(0.01)
 
         self.cap.release()
