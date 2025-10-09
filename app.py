@@ -16,7 +16,9 @@ app = Flask(__name__)
 database.init_db()
 
 # --- Create and start the Vision Processor in a background thread ---
-vision_processor = VisionProcessor(model_path='runs/detect/train/weights/best.pt')
+vision_processor = VisionProcessor(
+    model_path='runs/detect/train/weights/best.pt'
+)
 vision_thread = threading.Thread(target=vision_processor.run, daemon=True)
 vision_thread.start()
 
@@ -129,7 +131,6 @@ def dashboard_data():
             end_time = datetime.fromisoformat(end_time_str)
             total_duration_minutes += (end_time - start_time).total_seconds() / 60
 
-    # Get data for charts
     timeline_labels, cumulative_out, cumulative_in = database.get_timeseries_data(session_ids)
     throughput_per_minute = database.get_throughput_per_minute(session_ids)
 
@@ -164,6 +165,22 @@ def export_by_date():
         mimetype="text/csv",
         headers={"Content-disposition":
                  f"attachment; filename=thaal_events_{date_str}.csv"}
+    )
+
+@app.route('/export_sessions')
+def export_sessions():
+    """Exports the entire sessions table as a CSV file."""
+    sessions = database.get_all_sessions()
+    
+    csv_data = "session_id,start_time,end_time,expected_thaals,final_thaals_out,final_thaals_in\n"
+    for session in sessions:
+        csv_data += ",".join(map(str, session)) + "\n"
+        
+    return Response(
+        csv_data,
+        mimetype="text/csv",
+        headers={"Content-disposition":
+                 "attachment; filename=sessions_summary.csv"}
     )
 
 

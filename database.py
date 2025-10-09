@@ -7,7 +7,6 @@ def init_db():
     """Initializes the database and creates tables if they don't exist."""
     conn = sqlite3.connect(DB_FILE, check_same_thread=False)
     cursor = conn.cursor()
-    # Using TEXT for DATETIME for simplicity with Python's isoformat
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -39,13 +38,12 @@ def create_session(session_id, start_time, expected_thaals=None):
     conn.close()
     log_event("SERVICE_START", session_id)
 
-def end_session(session_id, stop_time=None):
+def end_session(session_id, end_time):
     """Updates a session record with its end time."""
     conn = sqlite3.connect(DB_FILE, check_same_thread=False)
     cursor = conn.cursor()
-    end_time = stop_time.isoformat() if stop_time else datetime.now().isoformat()
     cursor.execute("UPDATE sessions SET end_time = ? WHERE session_id = ?",
-                   (end_time, session_id))
+                   (end_time.isoformat(), session_id))
     conn.commit()
     conn.close()
     log_event("SERVICE_STOP", session_id)
@@ -75,6 +73,15 @@ def get_sessions_for_date(date_obj):
     conn = sqlite3.connect(DB_FILE, check_same_thread=False)
     cursor = conn.cursor()
     cursor.execute("SELECT session_id, start_time, end_time, expected_thaals, final_thaals_out, final_thaals_in FROM sessions WHERE DATE(start_time) = ?", (date_obj.strftime('%Y-%m-%d'),))
+    sessions = cursor.fetchall()
+    conn.close()
+    return sessions
+
+def get_all_sessions():
+    """Fetches all sessions from the database for a full export."""
+    conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM sessions ORDER BY start_time DESC")
     sessions = cursor.fetchall()
     conn.close()
     return sessions

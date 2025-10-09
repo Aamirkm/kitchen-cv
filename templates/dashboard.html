@@ -22,15 +22,15 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            gap: 20px;
+            gap: 15px; /* Adjusted gap */
             margin-bottom: 30px;
             background-color: #34495e;
             padding: 20px;
             border-radius: 8px;
-            flex-wrap: wrap; /* Allow controls to wrap on smaller screens */
+            flex-wrap: wrap; 
         }
         .controls label {
-            white-space: nowrap; /* Prevent label from breaking */
+            white-space: nowrap; 
         }
         .controls input[type="date"], .controls a {
             padding: 10px;
@@ -81,14 +81,14 @@
             padding: 20px;
             border-radius: 8px;
             margin-bottom: 20px;
-            height: 700px; 
+            height: 650px; 
             position: relative;
         }
         #no-data-message {
             text-align: center;
             font-size: 1.5em;
             padding: 50px;
-            display: none; /* Hidden by default */
+            display: none;
         }
     </style>
 </head>
@@ -100,7 +100,10 @@
             <a href="/" class="btn-back">Back to Live View</a>
             <label for="date-picker">Select Date:</label>
             <input type="date" id="date-picker">
-            <a id="export-link" href="#">Export Day's Data (CSV)</a>
+            <!-- FIX: Renamed button for clarity -->
+            <a id="export-link" href="#">Export Day's Event Log</a>
+            <!-- FIX: Added new button for session summary export -->
+            <a href="/export_sessions">Export All Sessions</a>
         </div>
         
         <div id="dashboard-content">
@@ -129,7 +132,6 @@
             </div>
 
             <div class="chart-container">
-                <!-- FIX: Update chart title -->
                 <h3>Throughput per Minute</h3>
                 <canvas id="throughput-chart"></canvas>
             </div>
@@ -154,7 +156,6 @@
                 document.getElementById('dashboard-content').style.display = 'block';
                 document.getElementById('no-data-message').style.display = 'none';
 
-                // Update metric cards
                 document.getElementById('total-out').textContent = data.total_thaals_out;
                 document.getElementById('total-in').textContent = data.total_thaals_in;
                 document.getElementById('total-duration').textContent = data.total_duration_minutes;
@@ -171,7 +172,6 @@
                     maintainAspectRatio: true 
                 };
                 
-                // --- Update Bar Chart (Throughput) ---
                 const throughputCtx = document.getElementById('throughput-chart').getContext('2d');
                 if (throughputChart) {
                     throughputChart.destroy();
@@ -181,7 +181,6 @@
                     data: {
                         labels: Object.keys(data.throughput_per_minute),
                         datasets: [{
-                            // FIX: Update dataset label
                             label: 'Thaals Served Per Minute',
                             data: Object.values(data.throughput_per_minute),
                             backgroundColor: 'rgba(52, 152, 219, 0.5)',
@@ -192,7 +191,6 @@
                     options: chartOptions
                 });
 
-                // --- Update Line Chart (Cumulative Flow) ---
                 const cumulativeCtx = document.getElementById('cumulative-chart').getContext('2d');
                 if (cumulativeChart) {
                     cumulativeChart.destroy();
@@ -205,7 +203,7 @@
                             {
                                 label: 'Cumulative Thaals Out',
                                 data: data.cumulative_out_data,
-                                borderColor: 'rgba(46, 204, 113, 1)', // Green
+                                borderColor: 'rgba(46, 204, 113, 1)',
                                 backgroundColor: 'rgba(46, 204, 113, 0.2)',
                                 fill: true,
                                 tension: 0.1
@@ -213,7 +211,7 @@
                             {
                                 label: 'Cumulative Thaals In',
                                 data: data.cumulative_in_data,
-                                borderColor: 'rgba(231, 76, 60, 1)', // Red
+                                borderColor: 'rgba(231, 76, 60, 1)',
                                 backgroundColor: 'rgba(231, 76, 60, 0.2)',
                                 fill: true,
                                 tension: 0.1
