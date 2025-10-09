@@ -47,7 +47,6 @@
         .controls a:hover {
             background-color: #2980b9;
         }
-        /* Style for the new back button */
         .btn-back {
             background-color: #8e44ad !important;
         }
@@ -82,7 +81,7 @@
             padding: 20px;
             border-radius: 8px;
             margin-bottom: 20px;
-            height: 400px; 
+            height: 700px; 
             position: relative;
         }
         #no-data-message {
@@ -98,7 +97,6 @@
     <div class="container">
         <h1>Data Dashboard</h1>
         <div class="controls">
-            <!-- FIX: Added "Back to Live View" button -->
             <a href="/" class="btn-back">Back to Live View</a>
             <label for="date-picker">Select Date:</label>
             <input type="date" id="date-picker">
@@ -131,7 +129,8 @@
             </div>
 
             <div class="chart-container">
-                <h3>Throughput per Hour</h3>
+                <!-- FIX: Update chart title -->
+                <h3>Throughput per Minute</h3>
                 <canvas id="throughput-chart"></canvas>
             </div>
         </div>
@@ -180,10 +179,11 @@
                 throughputChart = new Chart(throughputCtx, {
                     type: 'bar',
                     data: {
-                        labels: Object.keys(data.hourly_throughput),
+                        labels: Object.keys(data.throughput_per_minute),
                         datasets: [{
-                            label: 'Thaals Served Per Hour',
-                            data: Object.values(data.hourly_throughput),
+                            // FIX: Update dataset label
+                            label: 'Thaals Served Per Minute',
+                            data: Object.values(data.throughput_per_minute),
                             backgroundColor: 'rgba(52, 152, 219, 0.5)',
                             borderColor: 'rgba(52, 152, 219, 1)',
                             borderWidth: 1

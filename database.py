@@ -30,10 +30,9 @@ def init_db():
     conn.close()
 
 def create_session(session_id, expected_thaals=None):
-    """Creates a new record for a service session using local time."""
+    """Creates a new record for a service session."""
     conn = sqlite3.connect(DB_FILE, check_same_thread=False)
     cursor = conn.cursor()
-    # Reverted to datetime.now()
     cursor.execute("INSERT INTO sessions (session_id, start_time, expected_thaals) VALUES (?, ?, ?)",
                    (session_id, datetime.now().isoformat(), expected_thaals))
     conn.commit()
@@ -41,10 +40,9 @@ def create_session(session_id, expected_thaals=None):
     log_event("SERVICE_START", session_id)
 
 def end_session(session_id):
-    """Updates a session record with its end time using local time."""
+    """Updates a session record with its end time."""
     conn = sqlite3.connect(DB_FILE, check_same_thread=False)
     cursor = conn.cursor()
-    # Reverted to datetime.now()
     cursor.execute("UPDATE sessions SET end_time = ? WHERE session_id = ?",
                    (datetime.now().isoformat(), session_id))
     conn.commit()
@@ -61,10 +59,9 @@ def update_session_summary(session_id, out_count, in_count):
     conn.close()
 
 def log_event(event_type, session_id=None):
-    """Logs an individual event to the events table using local time."""
+    """Logs an individual event to the events table."""
     conn = sqlite3.connect(DB_FILE, check_same_thread=False)
     cursor = conn.cursor()
-    # Reverted to datetime.now()
     cursor.execute("INSERT INTO events (timestamp, event_type, session_id) VALUES (?, ?, ?)",
                    (datetime.now().isoformat(), event_type, session_id))
     conn.commit()
@@ -76,7 +73,6 @@ def get_sessions_for_date(date_obj):
     """Finds all session data that occurred on a specific date."""
     conn = sqlite3.connect(DB_FILE, check_same_thread=False)
     cursor = conn.cursor()
-    # Removed the 'localtime' modifier
     cursor.execute("SELECT session_id, start_time, end_time, expected_thaals, final_thaals_out, final_thaals_in FROM sessions WHERE DATE(start_time) = ?", (date_obj.strftime('%Y-%m-%d'),))
     sessions = cursor.fetchall()
     conn.close()
@@ -86,7 +82,6 @@ def get_events_for_date(date_obj):
     """Gets all raw event data for a given date for CSV export."""
     conn = sqlite3.connect(DB_FILE, check_same_thread=False)
     cursor = conn.cursor()
-    # Removed the 'localtime' modifier
     cursor.execute("SELECT * FROM events WHERE DATE(timestamp) = ? ORDER BY timestamp ASC", (date_obj.strftime('%Y-%m-%d'),))
     events = cursor.fetchall()
     conn.close()
@@ -110,13 +105,11 @@ def get_timeseries_data(session_ids):
     if not events:
         return [], [], []
 
-    # Simplified: convert from ISO string to datetime object
     local_events = [(datetime.fromisoformat(ts_str), event_type) for ts_str, event_type in events]
         
     start_time = local_events[0][0]
     end_time = local_events[-1][0]
     
-    # Align start time to the beginning of a 5-minute interval for clean chart labels
     start_time -= timedelta(minutes=start_time.minute % 5,
                             seconds=start_time.second,
                             microseconds=start_time.microsecond)
@@ -130,7 +123,6 @@ def get_timeseries_data(session_ids):
     event_index = 0
 
     current_time = start_time
-    # Add a buffer to the end time to ensure the last interval is included
     while current_time <= end_time + timedelta(minutes=5):
         labels.append(current_time.strftime('%H:%M'))
         
@@ -148,4 +140,33 @@ def get_timeseries_data(session_ids):
         current_time = next_interval_time
         
     return labels, cumulative_out, cumulative_in
+
+def get_throughput_per_minute(session_ids):
+    """Calculates the number of 'THAAL_OUT' events per minute for the given sessions."""
+    if not session_ids:
+        return {}
+    
+    conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+    cursor = conn.cursor()
+    
+    placeholders = ','.join('?' for _ in session_ids)
+    query = f"SELECT timestamp FROM events WHERE session_id IN ({placeholders}) AND event_type = 'THAAL_OUT' ORDER BY timestamp ASC"
+    
+    cursor.execute(query, session_ids)
+    events = cursor.fetchall()
+    conn.close()
+    
+    if not events:
+        return {}
+        
+    throughput = {}
+    for (ts_str,) in events:
+        event_time = datetime.fromisoformat(ts_str)
+        minute_label = event_time.strftime('%H:%M')
+        
+        if minute_label not in throughput:
+            throughput[minute_label] = 0
+        throughput[minute_label] += 1
+        
+    return throughput
 

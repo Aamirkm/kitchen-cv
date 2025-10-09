@@ -2,7 +2,7 @@ import cv2
 from flask import Flask, render_template, Response, request, jsonify
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, date
 
 # Import from our other project files
 from vision_processor import VisionProcessor
@@ -16,7 +16,6 @@ app = Flask(__name__)
 database.init_db()
 
 # --- Create and start the Vision Processor in a background thread ---
-# Reverted to simpler initialization
 vision_processor = VisionProcessor(model_path='runs/detect/train/weights/best.pt')
 vision_thread = threading.Thread(target=vision_processor.run, daemon=True)
 vision_thread.start()
@@ -30,24 +29,20 @@ def generate_frames():
     print("Client connected to video stream.")
     try:
         while True:
-            # Get the latest annotated frame from the vision processor
             frame = vision_processor.get_annotated_frame()
             if frame is None:
                 time.sleep(0.1)
                 continue
 
-            # Resize frame for a smoother streaming experience
             stream_frame = cv2.resize(frame, (960, 540))
             (flag, encoded_image) = cv2.imencode('.jpg', stream_frame)
             if not flag:
                 continue
 
-            # Yield the frame in byte format for streaming
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encoded_image) + b'\r\n')
             
-            # Control the streaming frame rate to reduce load
-            time.sleep(0.05) # ~20 FPS cap
+            time.sleep(0.05)
     finally:
         print("Client disconnected from video stream.")
 
@@ -112,7 +107,6 @@ def dashboard_data():
     if not sessions:
         return jsonify(message="No event data found for the selected date.")
 
-    # Aggregate data across all sessions for the day
     total_expected = 0
     total_out = 0
     total_in = 0
@@ -123,9 +117,8 @@ def dashboard_data():
         session_id, start_time_str, end_time_str, expected, final_out, final_in = session
         session_ids.append(session_id)
         
-        # Robust check for expected thaals
-        if expected is not None and str(expected).isdigit():
-            total_expected += int(expected)
+        if expected and isinstance(expected, int):
+            total_expected += expected
         if final_out:
             total_out += final_out
         if final_in:
@@ -137,28 +130,18 @@ def dashboard_data():
             total_duration_minutes += (end_time - start_time).total_seconds() / 60
 
     # Get data for charts
-    labels, cumulative_out, cumulative_in = database.get_timeseries_data(session_ids)
-    
-    # Calculate hourly throughput from the timeseries data
-    hourly_throughput = {}
-    for i, label in enumerate(labels):
-        hour = label.split(':')[0]
-        if hour not in hourly_throughput:
-            hourly_throughput[hour] = 0
-        
-        # Calculate the number of 'out' events in this 5-minute interval
-        count_in_interval = cumulative_out[i] - (cumulative_out[i-1] if i > 0 else 0)
-        hourly_throughput[hour] += count_in_interval
+    timeline_labels, cumulative_out, cumulative_in = database.get_timeseries_data(session_ids)
+    throughput_per_minute = database.get_throughput_per_minute(session_ids)
 
     return jsonify({
         'total_thaals_out': total_out,
         'total_thaals_in': total_in,
         'total_expected': total_expected if total_expected > 0 else "N/A",
         'total_duration_minutes': round(total_duration_minutes),
-        'timeline_labels': labels,
+        'timeline_labels': timeline_labels,
         'cumulative_out_data': cumulative_out,
         'cumulative_in_data': cumulative_in,
-        'hourly_throughput': hourly_throughput
+        'throughput_per_minute': throughput_per_minute
     })
 
 
@@ -172,7 +155,6 @@ def export_by_date():
     query_date = datetime.strptime(date_str, '%Y-%m-%d').date()
     events = database.get_events_for_date(query_date)
     
-    # Create CSV content in memory
     csv_data = "id,timestamp,event_type,session_id\n"
     for event in events:
         csv_data += ",".join(map(str, event)) + "\n"

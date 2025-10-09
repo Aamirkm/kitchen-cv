@@ -145,8 +145,8 @@ class VisionProcessor:
             # Draw lines and counts regardless of service state
             cv2.line(annotated_frame, (self.LINE_OUT_POSITION, 0), (self.LINE_OUT_POSITION, self.FRAME_HEIGHT), (0, 255, 0), 2)
             cv2.line(annotated_frame, (self.LINE_IN_POSITION, 0), (self.LINE_IN_POSITION, self.FRAME_HEIGHT), (0, 0, 255), 2)
-            cv2.putText(annotated_frame, f"Thaal Out: {self.thaal_out_count}", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3)
-            cv2.putText(annotated_frame, f"Thaal In: {self.thaal_in_count}", (self.FRAME_WIDTH - 350, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
+            cv2.putText(annotated_frame, f"Thaals Out: {self.thaal_out_count}", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3)
+            cv2.putText(annotated_frame, f"Thaals In: {self.thaal_in_count}", (self.FRAME_WIDTH - 300, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
 
             # Update the global annotated frame
             with self.frame_lock:
