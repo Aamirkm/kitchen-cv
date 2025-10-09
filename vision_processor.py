@@ -3,7 +3,6 @@ from ultralytics import YOLO
 import threading
 import time
 from datetime import datetime
-import uuid
 import database  # <-- Reverted to direct import
 
 class VisionProcessor:
@@ -51,14 +50,19 @@ class VisionProcessor:
             if not self.is_service_active:
                 self._reset_counts()
                 self.is_service_active = True
-                self.current_session_id = str(uuid.uuid4())
-                database.create_session(self.current_session_id, expected_thaals)
+                # --- CHANGE: Use a human-readable, timestamp-based session ID ---
+                start_time = datetime.now()
+                self.current_session_id = start_time.strftime("session-%Y-%m-%d-%H%M%S")
+                
+                # We need to pass the start_time object to the database function
+                database.create_session(self.current_session_id, start_time, expected_thaals)
                 print(f"Service started with Session ID: {self.current_session_id}")
 
                 # Start the 3-hour auto-stop timer
                 if self.auto_stop_timer:
                     self.auto_stop_timer.cancel()
-                self.auto_stop_timer = threading.Timer(10, self.stop_service)
+                # Set timer for 3 hours (10800 seconds)
+                self.auto_stop_timer = threading.Timer(3 * 60 * 60, self.stop_service) 
                 self.auto_stop_timer.start()
 
     def stop_service(self):
@@ -66,7 +70,8 @@ class VisionProcessor:
         with self.state_lock:
             if self.is_service_active:
                 self.is_service_active = False
-                database.end_session(self.current_session_id)
+                stop_time = datetime.now()
+                database.end_session(self.current_session_id, stop_time)
                 database.update_session_summary(self.current_session_id, self.thaal_out_count, self.thaal_in_count)
                 print(f"Service stopped for Session ID: {self.current_session_id}")
                 self._reset_counts()

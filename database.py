@@ -29,22 +29,23 @@ def init_db():
     conn.commit()
     conn.close()
 
-def create_session(session_id, expected_thaals=None):
+def create_session(session_id, start_time, expected_thaals=None):
     """Creates a new record for a service session."""
     conn = sqlite3.connect(DB_FILE, check_same_thread=False)
     cursor = conn.cursor()
     cursor.execute("INSERT INTO sessions (session_id, start_time, expected_thaals) VALUES (?, ?, ?)",
-                   (session_id, datetime.now().isoformat(), expected_thaals))
+                   (session_id, start_time.isoformat(), expected_thaals))
     conn.commit()
     conn.close()
     log_event("SERVICE_START", session_id)
 
-def end_session(session_id):
+def end_session(session_id, stop_time=None):
     """Updates a session record with its end time."""
     conn = sqlite3.connect(DB_FILE, check_same_thread=False)
     cursor = conn.cursor()
+    end_time = stop_time.isoformat() if stop_time else datetime.now().isoformat()
     cursor.execute("UPDATE sessions SET end_time = ? WHERE session_id = ?",
-                   (datetime.now().isoformat(), session_id))
+                   (end_time, session_id))
     conn.commit()
     conn.close()
     log_event("SERVICE_STOP", session_id)
