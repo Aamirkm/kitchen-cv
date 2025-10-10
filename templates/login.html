@@ -135,30 +135,85 @@
             height: 100%;
             background-color: rgba(0, 0, 0, 0.8);
             overflow-y: auto;
+            overflow-x: hidden; /* Prevent horizontal scrolling */
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+            touch-action: pan-y; /* Only allow vertical scrolling */
         }
         .modal-content {
             background-color: #34495e;
-            margin: 5% auto;
-            padding: 30px;
+            margin: 2% auto;
+            padding: 20px;
             border-radius: 12px;
-            width: 90%;
+            width: calc(100% - 20px);
             max-width: 600px;
-            max-height: 80vh;
+            min-height: 50vh;
+            max-height: 90vh;
             overflow-y: auto;
+            overflow-x: hidden; /* Prevent horizontal scrolling */
             position: relative;
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+            touch-action: pan-y; /* Only allow vertical scrolling */
         }
-        .close {
-            color: #bdc3c7;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
+        
+        /* Mobile-specific modal styles */
+        @media (max-width: 768px) {
+            .modal {
+                padding: 10px;
+            }
+            .modal-content {
+                margin: 5% auto;
+                padding: 15px;
+                width: 80%;
+                max-height: 85vh;
+                border-radius: 8px;
+            }
+            .modal h2 {
+                font-size: 1.5em;
+                margin-bottom: 15px;
+            }
+            .modal h3 {
+                font-size: 1.1em;
+                margin-top: 20px;
+                margin-bottom: 8px;
+            }
+            .modal p, .modal li {
+                font-size: 0.9em;
+                line-height: 1.5;
+            }
+            .developer-section {
+                padding: 15px;
+                margin-top: 15px;
+            }
+        }
+        .close-btn {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.1em;
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 8px;
             cursor: pointer;
-            position: absolute;
-            top: 15px;
-            right: 20px;
+            transition: background-color 0.3s;
+            font-weight: 600;
+            margin-top: 20px;
+            -webkit-tap-highlight-color: transparent;
         }
-        .close:hover {
-            color: #ecf0f1;
+        .close-btn:hover {
+            background-color: #c0392b;
+        }
+        .close-btn:active {
+            transform: scale(0.98);
+            background-color: #a93226;
+        }
+        
+        /* Mobile-friendly close button */
+        @media (max-width: 768px) {
+            .close-btn {
+                padding: 18px;
+                font-size: 1.2em;
+                margin-top: 25px;
+            }
         }
         .modal h2 {
             color: #3498db;
@@ -232,14 +287,13 @@
     <!-- About Modal -->
     <div id="aboutModal" class="modal">
         <div class="modal-content">
-            <span class="close" onclick="closeAbout()">&times;</span>
             <h2>About Thaal Counter</h2>
             
             <h3>What is this application?</h3>
             <p>The Thaal Counter is a computer vision application designed specifically for mosque kitchens to automatically track and count metal serving plates (thaals) as they move between the kitchen and dining hall.</p>
             
             <h3>Why was it created?</h3>
-            <p>Managing thaal inventory during community meals can be challenging. This system eliminates manual counting, reduces human error, and provides real-time data to help kitchen staff efficiently manage the flow of serving plates during busy meal times. It's also the beginning of data anaylysis for the kitchen</p>
+            <p>Managing thaal inventory during community meals can be challenging. This system eliminates manual counting, reduces human error, and provides real-time data to help kitchen staff efficiently manage the flow of serving plates during busy meal times. It's also the beginning of data anaylysis for the kitchen!</p>
             
             <h3>How does it work?</h3>
             <ul>
@@ -273,6 +327,8 @@
                 <p><strong>Connect:</strong> <a href="https://www.linkedin.com/in/merchant-aamir/" target="_blank" style="color: #3498db; text-decoration: none;">LinkedIn Profile</a></p>
                 <p><strong>Support:</strong> For troubleshooting or technical support, please reach out to <a href="mailto:aamirkmerchant@gmail.com" style="color: #3498db; text-decoration: none;">aamirkmerchant@gmail.com</a></p>
             </div>
+            
+            <button class="close-btn" onclick="closeAbout()">Close</button>
         </div>
     </div>
 
@@ -353,20 +409,29 @@
 
         // About modal functions
         function openAbout() {
-            document.getElementById('aboutModal').style.display = 'block';
+            const modal = document.getElementById('aboutModal');
+            modal.style.display = 'block';
+            // Prevent body scrolling on mobile when modal is open
+            document.body.style.overflow = 'hidden';
         }
 
         function closeAbout() {
-            document.getElementById('aboutModal').style.display = 'none';
+            const modal = document.getElementById('aboutModal');
+            modal.style.display = 'none';
+            // Restore body scrolling
+            document.body.style.overflow = 'auto';
         }
 
-        // Close modal when clicking outside of it
-        window.onclick = function(event) {
+        // Close modal when clicking outside of it (improved for mobile)
+        function handleModalClick(event) {
             const modal = document.getElementById('aboutModal');
             if (event.target === modal) {
                 closeAbout();
             }
         }
+
+        // Add event listeners for better mobile support
+        document.addEventListener('click', handleModalClick);
 
         // Close modal with Escape key
         document.addEventListener('keydown', function(event) {
