@@ -82,13 +82,33 @@
             border-radius: 8px;
             margin-bottom: 20px;
             position: relative;
-            /* --- FIX: Removed aspect-ratio and height to let Chart.js control the size --- */
         }
         #no-data-message {
             text-align: center;
             font-size: 1.5em;
             padding: 50px;
             display: none;
+        }
+        /* --- NEW: Notes Section Styling --- */
+        .notes-section {
+            background-color: #34495e;
+            padding: 25px;
+            border-radius: 8px;
+            margin-top: 40px;
+            text-align: left;
+        }
+        .notes-section h2 {
+            margin-top: 0;
+            text-align: center;
+        }
+        .notes-section ul {
+            padding-left: 20px;
+        }
+        .notes-section li {
+            margin-bottom: 10px;
+        }
+        .notes-section strong {
+            color: #3498db;
         }
     </style>
 </head>
@@ -107,11 +127,11 @@
         <div id="dashboard-content">
             <div class="metrics">
                 <div class="metric-card">
-                    <h2>Total Thaals Out</h2>
+                    <h2>Thaals Out</h2>
                     <p id="total-out">--</p>
                 </div>
                 <div class="metric-card">
-                    <h2>Total Thaals In</h2>
+                    <h2>Thaals In</h2>
                     <p id="total-in">--</p>
                 </div>
                  <div class="metric-card">
@@ -123,11 +143,11 @@
                     <p id="total-duration">--</p>
                 </div>
                 <div class="metric-card">
-                    <h2>Serving Duration</h2>
+                    <h2>Out Duration</h2>
                     <p id="serving-duration">--</p>
                 </div>
                 <div class="metric-card">
-                    <h2>Return Duration</h2>
+                    <h2>In Duration</h2>
                     <p id="returning-duration">--</p>
                 </div>
                  <div class="metric-card">
@@ -153,6 +173,23 @@
 
         <div id="no-data-message">
             <p>No event data found for the selected date.</p>
+            <p>Try 'Export All Sessions' to see all data.</p>
+        </div>
+
+        <!-- --- NEW: Notes Section --- -->
+        <div class="notes-section">
+            <h2>Metric & Button Explanations</h2>
+            <ul>
+                <li><strong>Thaals Out/In:</strong> The total count of thaals that crossed the 'Out' (Kitchen to Hall) and 'In' (Hall to Kitchen) lines for the selected day.</li>
+                <li><strong>Expected Thaals:</strong> The optional number entered by the manager at the start of the service.</li>
+                <li><strong>Service Duration:</strong> The total combined time in minutes for all service sessions on the selected day.</li>
+                <li><strong>Out Duration:</strong> The time in minutes from the first thaal going out to the last thaal going out. Measures the length of the serving period.</li>
+                <li><strong>In Duration:</strong> The time in minutes from the first thaal coming in to the last thaal coming in. Measures the length of the return/cleanup period.</li>
+                <li><strong>Full Cycle:</strong> The time in minutes from the very first thaal going out to the very last thaal coming back in. Measures the entire operational window.</li>
+                <li><strong>Discrepancy Rate:</strong> A measure of counting accuracy. It shows the percentage of thaals that went out but were not counted coming back in for the selected day.</li>
+                <li><strong>Export Day's Event Log:</strong> Downloads a detailed CSV file with a timestamp for every single thaal that was counted in or out on the selected day.</li>
+                <li><strong>Export All Sessions:</strong> Downloads a summary CSV file containing one row for every service session ever recorded, with start/end times and final counts.</li>
+            </ul>
         </div>
     </div>
 
@@ -198,7 +235,6 @@
                     legend: { labels: { color: '#ecf0f1' } }
                 },
                 responsive: true,
-                // --- FIX: Let Chart.js handle the aspect ratio by default ---
                 maintainAspectRatio: true 
             };
             
