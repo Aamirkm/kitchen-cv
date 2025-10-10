@@ -83,6 +83,22 @@
             background-color: #7f8c8d;
             cursor: not-allowed;
         }
+        .btn-about {
+            width: 100%;
+            padding: 12px;
+            font-size: 1em;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            font-weight: 500;
+            margin-top: 15px;
+        }
+        .btn-about:hover {
+            background-color: #2980b9;
+        }
         .error-message {
             color: #e74c3c;
             margin-top: 15px;
@@ -106,6 +122,73 @@
             border-top: 1px solid #7f8c8d;
             color: #bdc3c7;
             font-size: 0.9em;
+        }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            overflow-y: auto;
+        }
+        .modal-content {
+            background-color: #34495e;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+        }
+        .close {
+            color: #bdc3c7;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            position: absolute;
+            top: 15px;
+            right: 20px;
+        }
+        .close:hover {
+            color: #ecf0f1;
+        }
+        .modal h2 {
+            color: #3498db;
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+        .modal h3 {
+            color: #ecf0f1;
+            margin-top: 25px;
+            margin-bottom: 10px;
+            font-size: 1.3em;
+        }
+        .modal p, .modal li {
+            color: #bdc3c7;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+        .modal ul {
+            padding-left: 20px;
+        }
+        .modal strong {
+            color: #3498db;
+        }
+        .developer-section {
+            background-color: #2c3e50;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border-left: 4px solid #3498db;
         }
     </style>
 </head>
@@ -132,6 +215,10 @@
                 Access System
             </button>
             
+            <button type="button" class="btn-about" onclick="openAbout()">
+                About
+            </button>
+            
             <div class="error-message" id="errorMessage"></div>
             <div class="success-message" id="successMessage"></div>
             <div class="loading" id="loadingMessage">Authenticating...</div>
@@ -139,6 +226,53 @@
         
         <div class="mosque-info">
             <p>Made by Aamir Merchant</p>
+        </div>
+    </div>
+
+    <!-- About Modal -->
+    <div id="aboutModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeAbout()">&times;</span>
+            <h2>About Thaal Counter</h2>
+            
+            <h3>What is this application?</h3>
+            <p>The Thaal Counter is a computer vision application designed specifically for mosque kitchens to automatically track and count metal serving plates (thaals) as they move between the kitchen and dining hall.</p>
+            
+            <h3>Why was it created?</h3>
+            <p>Managing thaal inventory during community meals can be challenging. This system eliminates manual counting, reduces human error, and provides real-time data to help kitchen staff efficiently manage the flow of serving plates during busy meal times. It's also the beginning of data anaylysis for the kitchen</p>
+            
+            <h3>How does it work?</h3>
+            <ul>
+                <li><strong>Computer Vision:</strong> Uses a Raspberry Pi with a webcam to monitor the counter area</li>
+                <li><strong>AI Detection:</strong> Custom-trained YOLO model recognizes and tracks individual thaals</li>
+                <li><strong>Line Crossing Detection:</strong> Counts thaals going out (kitchen to hall) and coming in (hall to kitchen)</li>
+                <li><strong>Real-time Monitoring:</strong> Live video feed with visual tracking and counting</li>
+                <li><strong>Data Analytics:</strong> Historical dashboard with charts and export capabilities</li>
+            </ul>
+            
+            <h3>Where is it used?</h3>
+            <p>This system is deployed in the mosque kitchen, positioned to monitor the counter area where thaals are placed when moving between the kitchen preparation area and the dining hall where community members eat.</p>
+            
+            <h3>When is it active?</h3>
+            <p>The system can be activated during meal service times. Staff can start/stop the counting service as needed, and the system automatically tracks all thaal movements during active periods.</p>
+            
+            <h3>Key Features</h3>
+            <ul>
+                <li><strong>Secure Access:</strong> 4-digit passcode protection</li>
+                <li><strong>Live Monitoring:</strong> Real-time video feed with tracking visualization</li>
+                <li><strong>Service Control:</strong> Start/stop counting with expected thaal count</li>
+                <li><strong>Data Dashboard:</strong> Historical analysis with charts and metrics</li>
+                <li><strong>Export Capabilities:</strong> Download data for record keeping</li>
+                <li><strong>Mobile Friendly:</strong> Responsive design for various devices</li>
+            </ul>
+            
+            <div class="developer-section">
+                <h3>About the Developer</h3>
+                <p><strong>Aamir Merchant</strong> developed this application as a solution for his mosque's kitchen management needs. Combining computer vision, machine learning, and web development skills, he created a practical tool that streamlines the thaal tracking process.</p>
+                <p>This project demonstrates the power of AI and computer vision in solving real-world community challenges, making daily operations more efficient and data-driven.</p>
+                <p><strong>Connect:</strong> <a href="https://www.linkedin.com/in/merchant-aamir/" target="_blank" style="color: #3498db; text-decoration: none;">LinkedIn Profile</a></p>
+                <p><strong>Support:</strong> For troubleshooting or technical support, please reach out to <a href="mailto:aamirkmerchant@gmail.com" style="color: #3498db; text-decoration: none;">aamirkmerchant@gmail.com</a></p>
+            </div>
         </div>
     </div>
 
@@ -214,6 +348,30 @@
         passcodeInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 form.dispatchEvent(new Event('submit'));
+            }
+        });
+
+        // About modal functions
+        function openAbout() {
+            document.getElementById('aboutModal').style.display = 'block';
+        }
+
+        function closeAbout() {
+            document.getElementById('aboutModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            const modal = document.getElementById('aboutModal');
+            if (event.target === modal) {
+                closeAbout();
+            }
+        }
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeAbout();
             }
         });
     </script>
