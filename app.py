@@ -133,12 +133,18 @@ def dashboard_data():
 
     timeline_labels, cumulative_out, cumulative_in = database.get_timeseries_data(session_ids)
     throughput_per_minute = database.get_throughput_per_minute(session_ids)
+    serving_duration, returning_duration, full_cycle_duration = database.get_duration_metrics(session_ids)
 
     return jsonify({
         'total_thaals_out': total_out,
         'total_thaals_in': total_in,
         'total_expected': total_expected if total_expected > 0 else "N/A",
         'total_duration_minutes': round(total_duration_minutes),
+        
+        'serving_duration': serving_duration,
+        'returning_duration': returning_duration,
+        'full_cycle_duration': full_cycle_duration,
+
         'timeline_labels': timeline_labels,
         'cumulative_out_data': cumulative_out,
         'cumulative_in_data': cumulative_in,

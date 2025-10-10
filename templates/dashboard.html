@@ -22,7 +22,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            gap: 15px; /* Adjusted gap */
+            gap: 15px;
             margin-bottom: 30px;
             background-color: #34495e;
             padding: 20px;
@@ -42,7 +42,7 @@
             text-decoration: none;
             background-color: #3498db;
             color: white;
-            transition: background-color 0.3s;
+            transition: 0.3s;
         }
         .controls a:hover {
             background-color: #2980b9;
@@ -55,24 +55,24 @@
         }
         .metrics {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); /* Adjusted for more cards */
             gap: 20px;
             margin-bottom: 30px;
         }
         .metric-card {
             background-color: #34495e;
-            padding: 25px;
+            padding: 20px;
             border-radius: 8px;
             text-align: center;
         }
         .metric-card h2 {
             margin: 0 0 10px;
             color: #bdc3c7;
-            font-size: 1.2em;
+            font-size: 1em;
         }
         .metric-card p {
             margin: 0;
-            font-size: 2.5em;
+            font-size: 2em;
             font-weight: bold;
             color: #3498db;
         }
@@ -81,7 +81,7 @@
             padding: 20px;
             border-radius: 8px;
             margin-bottom: 20px;
-            height: 650px; 
+            height: 400px; 
             position: relative;
         }
         #no-data-message {
@@ -100,9 +100,7 @@
             <a href="/" class="btn-back">Back to Live View</a>
             <label for="date-picker">Select Date:</label>
             <input type="date" id="date-picker">
-            <!-- FIX: Renamed button for clarity -->
             <a id="export-link" href="#">Export Day's Event Log</a>
-            <!-- FIX: Added new button for session summary export -->
             <a href="/export_sessions">Export All Sessions</a>
         </div>
         
@@ -121,8 +119,21 @@
                     <p id="expected-thaals">--</p>
                 </div>
                 <div class="metric-card">
-                    <h2>Total Service (Minutes)</h2>
+                    <h2>Service (Mins)</h2>
                     <p id="total-duration">--</p>
+                </div>
+                <!-- FIX: Added new metric cards for durations -->
+                <div class="metric-card">
+                    <h2>Serving Duration</h2>
+                    <p id="serving-duration">--</p>
+                </div>
+                <div class="metric-card">
+                    <h2>Return Duration</h2>
+                    <p id="returning-duration">--</p>
+                </div>
+                 <div class="metric-card">
+                    <h2>Full Cycle</h2>
+                    <p id="full-cycle-duration">--</p>
                 </div>
             </div>
     
@@ -160,6 +171,12 @@
                 document.getElementById('total-in').textContent = data.total_thaals_in;
                 document.getElementById('total-duration').textContent = data.total_duration_minutes;
                 document.getElementById('expected-thaals').textContent = data.total_expected;
+
+                // FIX: Update new duration metric cards
+                document.getElementById('serving-duration').textContent = data.serving_duration;
+                document.getElementById('returning-duration').textContent = data.returning_duration;
+                document.getElementById('full-cycle-duration').textContent = data.full_cycle_duration;
+
 
                 const chartOptions = {
                     scales: {

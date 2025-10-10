@@ -1,5 +1,6 @@
 import sqlite3
 from datetime import datetime, timedelta
+from collections import Counter
 
 DB_FILE = "events.db"
 
@@ -94,6 +95,51 @@ def get_events_for_date(date_obj):
     events = cursor.fetchall()
     conn.close()
     return events
+
+def get_duration_metrics(session_ids):
+    """Calculates various duration metrics based on thaal out/in events."""
+    if not session_ids:
+        return 0, 0, 0
+
+    conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+    cursor = conn.cursor()
+
+    placeholders = ','.join('?' for _ in session_ids)
+    query = f"SELECT event_type, MIN(timestamp), MAX(timestamp) FROM events WHERE session_id IN ({placeholders}) AND event_type IN ('THAAL_OUT', 'THAAL_IN') GROUP BY event_type"
+    
+    cursor.execute(query, session_ids)
+    results = cursor.fetchall()
+    conn.close()
+
+    timestamps = {
+        'THAAL_OUT': {'min': None, 'max': None},
+        'THAAL_IN': {'min': None, 'max': None}
+    }
+
+    for event_type, min_ts, max_ts in results:
+        if min_ts:
+            timestamps[event_type]['min'] = datetime.fromisoformat(min_ts)
+        if max_ts:
+            timestamps[event_type]['max'] = datetime.fromisoformat(max_ts)
+
+    serving_duration = 0
+    returning_duration = 0
+    full_cycle_duration = 0
+
+    # Duration of serving (first thaal out to last thaal out)
+    if timestamps['THAAL_OUT']['min'] and timestamps['THAAL_OUT']['max']:
+        serving_duration = round((timestamps['THAAL_OUT']['max'] - timestamps['THAAL_OUT']['min']).total_seconds() / 60)
+
+    # Duration of returning (first thaal in to last thaal in)
+    if timestamps['THAAL_IN']['min'] and timestamps['THAAL_IN']['max']:
+        returning_duration = round((timestamps['THAAL_IN']['max'] - timestamps['THAAL_IN']['min']).total_seconds() / 60)
+        
+    # Duration of full cycle (first thaal out to last thaal in)
+    if timestamps['THAAL_OUT']['min'] and timestamps['THAAL_IN']['max']:
+        full_cycle_duration = round((timestamps['THAAL_IN']['max'] - timestamps['THAAL_OUT']['min']).total_seconds() / 60)
+
+    return serving_duration, returning_duration, full_cycle_duration
+
 
 def get_timeseries_data(session_ids):
     """Processes event data into a cumulative time-series for line charts."""
