@@ -1,8 +1,10 @@
 import cv2
-from flask import Flask, render_template, Response, request, jsonify
+from flask import Flask, render_template, Response, request, jsonify, session, redirect, url_for
 import threading
 import time
+import os
 from datetime import datetime, date
+from functools import wraps
 
 # Import from our other project files
 from vision_processor import VisionProcessor
@@ -13,7 +15,32 @@ import database
 # =============================================================================
 
 app = Flask(__name__)
+
+# Configure session management
+app.secret_key = os.environ.get('THAAL_COUNTER_SECRET_KEY')
+# No session timeout - users stay logged in indefinitely
+
+# Get passcode from environment variable
+CORRECT_PASSCODE = os.environ.get('THAAL_COUNTER_PASSCODE')
+
 database.init_db()
+
+# =============================================================================
+# Authentication Functions
+# =============================================================================
+
+def login_required(f):
+    """Decorator to require authentication for protected routes."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('authenticated'):
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# =============================================================================
+# Vision Processor Setup
+# =============================================================================
 
 # --- Create and start the Vision Processor in a background thread ---
 vision_processor = VisionProcessor(
@@ -53,17 +80,45 @@ def generate_frames():
 # Web Routes (Presentation Layer)
 # =============================================================================
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Handles login page display and passcode validation."""
+    if request.method == 'POST':
+        data = request.get_json()
+        passcode = data.get('passcode', '')
+        
+        if passcode == CORRECT_PASSCODE:
+            session['authenticated'] = True
+            return jsonify({'success': True, 'message': 'Login successful'})
+        else:
+            return jsonify({'success': False, 'message': 'Invalid passcode'})
+    
+    # If already authenticated, redirect to main page
+    if session.get('authenticated'):
+        return redirect(url_for('index'))
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    """Handles user logout."""
+    session.clear()
+    return redirect(url_for('login'))
+
 @app.route('/')
+@login_required
 def index():
     """Serves the main control panel page."""
     return render_template('main.html')
 
 @app.route('/dashboard')
+@login_required
 def dashboard():
     """Serves the data dashboard page."""
     return render_template('dashboard.html')
 
 @app.route('/video_feed')
+@login_required
 def video_feed():
     """Provides the video stream endpoint."""
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
@@ -71,6 +126,7 @@ def video_feed():
 # --- API Routes for Control ---
 
 @app.route('/start_service', methods=['POST'])
+@login_required
 def start_service():
     """Starts a new service session."""
     data = request.get_json()
@@ -79,12 +135,14 @@ def start_service():
     return jsonify(status="Service started", service_active=True)
 
 @app.route('/stop_service', methods=['POST'])
+@login_required
 def stop_service():
     """Stops the current service session."""
     vision_processor.stop_service()
     return jsonify(status="Service stopped", service_active=False)
 
 @app.route('/status', methods=['GET'])
+@login_required
 def status():
     """Returns the current status of the application."""
     status_data = vision_processor.get_status()
@@ -93,6 +151,7 @@ def status():
 # --- API Routes for Data ---
 
 @app.route('/api/dashboard_data')
+@login_required
 def dashboard_data():
     """Provides data for the historical dashboard."""
     date_str = request.args.get('date')
@@ -163,6 +222,7 @@ def dashboard_data():
 
 
 @app.route('/export_by_date')
+@login_required
 def export_by_date():
     """Exports all event logs for a given date as a CSV file."""
     date_str = request.args.get('date')
@@ -184,6 +244,7 @@ def export_by_date():
     )
 
 @app.route('/export_sessions')
+@login_required
 def export_sessions():
     """Exports the entire sessions table as a CSV file."""
     sessions = database.get_all_sessions()

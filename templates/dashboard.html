@@ -53,6 +53,12 @@
         .btn-back:hover {
             background-color: #986c25 !important;
         }
+        .btn-logout {
+            background-color: #be3f31 !important;
+        }
+        .btn-logout:hover {
+            background-color: #852b21 !important;
+        }
         .metrics {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -122,6 +128,7 @@
             <input type="date" id="date-picker">
             <a id="export-link" href="#">Export Day's Event Log</a>
             <a href="/export_sessions">Export All Sessions</a>
+            <a href="/logout" class="btn-logout">Logout</a>
         </div>
         
         <div id="dashboard-content">
