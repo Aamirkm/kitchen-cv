@@ -204,11 +204,13 @@
              if (!data || data.message) {
                 document.getElementById('dashboard-content').style.display = 'none';
                 document.getElementById('no-data-message').style.display = 'block';
+                document.querySelector('.notes-section').style.display = 'none';
                 return;
             }
             
             document.getElementById('dashboard-content').style.display = 'block';
             document.getElementById('no-data-message').style.display = 'none';
+            document.querySelector('.notes-section').style.display = 'block';
 
             const isMobile = window.innerWidth < 768;
 
@@ -295,6 +297,7 @@
             if (data.message) {
                  document.getElementById('dashboard-content').style.display = 'none';
                  document.getElementById('no-data-message').style.display = 'block';
+                 document.querySelector('.notes-section').style.display = 'none';
             } else {
                 document.getElementById('total-out').textContent = data.total_thaals_out;
                 document.getElementById('total-in').textContent = data.total_thaals_in;
