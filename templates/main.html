@@ -101,7 +101,7 @@
             <p id="live-thaal-in">0</p>
         </div>
         <div class="metric-card">
-            <h2>Expected Thaals</h2>
+            <h2>Registered Thaals</h2>
             <p id="live-expected">N/A</p>
         </div>
         <div class="metric-card">
@@ -149,10 +149,10 @@
         }
 
         function startService() {
-            const expected = prompt("Optional: Enter the expected number of thaals for this service:", "");
+            const expected = prompt("Optional: Enter the registered number of thaals for this service:", "");
             if (expected === null) { return; }
             if (expected.trim() !== "" && !/^\d+$/.test(expected)) {
-                alert("Please enter a valid number for expected thaals.");
+                alert("Please enter a valid number for registered thaals.");
                 return;
             }
             sendCommand('/start_service', { expected_thaals: expected });
