@@ -55,7 +55,7 @@
         }
         .metrics {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); /* Adjusted for more cards */
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
             gap: 15px;
             margin-bottom: 30px;
         }
@@ -81,8 +81,8 @@
             padding: 20px;
             border-radius: 8px;
             margin-bottom: 20px;
-            height: 400px; 
             position: relative;
+            /* --- FIX: Removed aspect-ratio and height to let Chart.js control the size --- */
         }
         #no-data-message {
             text-align: center;
@@ -119,7 +119,6 @@
                     <p id="expected-thaals">--</p>
                 </div>
                 <div class="metric-card">
-                    <!-- FIX: Update card title -->
                     <h2>Service Duration</h2>
                     <p id="total-duration">--</p>
                 </div>
@@ -162,84 +161,115 @@
         const exportLink = document.getElementById('export-link');
         let throughputChart;
         let cumulativeChart;
+        let currentChartData = null;
 
-        function updateDashboard(data) {
-            if (data.message) {
+        function drawCharts(data) {
+             if (!data || data.message) {
                 document.getElementById('dashboard-content').style.display = 'none';
                 document.getElementById('no-data-message').style.display = 'block';
-            } else {
-                document.getElementById('dashboard-content').style.display = 'block';
-                document.getElementById('no-data-message').style.display = 'none';
+                return;
+            }
+            
+            document.getElementById('dashboard-content').style.display = 'block';
+            document.getElementById('no-data-message').style.display = 'none';
 
+            const isMobile = window.innerWidth < 768;
+
+            const chartOptions = {
+                scales: {
+                    y: { 
+                        beginAtZero: true, 
+                        ticks: { color: '#ecf0f1', font: { size: isMobile ? 10 : 12 } }, 
+                        grid: { color: 'rgba(236, 240, 241, 0.1)' } 
+                    },
+                    x: { 
+                        ticks: { 
+                            color: '#ecf0f1', 
+                            font: { size: isMobile ? 9 : 12 },
+                            maxRotation: isMobile ? 90 : 0,
+                            minRotation: isMobile ? 90 : 0,
+                            autoSkip: true,
+                            maxTicksLimit: isMobile ? 10 : 30
+                        }, 
+                        grid: { color: 'rgba(236, 240, 241, 0.1)' } 
+                    }
+                },
+                plugins: { 
+                    legend: { labels: { color: '#ecf0f1' } }
+                },
+                responsive: true,
+                // --- FIX: Let Chart.js handle the aspect ratio by default ---
+                maintainAspectRatio: true 
+            };
+            
+            const throughputCtx = document.getElementById('throughput-chart').getContext('2d');
+            if (throughputChart) {
+                throughputChart.destroy();
+            }
+            throughputChart = new Chart(throughputCtx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(data.throughput_per_minute),
+                    datasets: [{
+                        label: 'Thaals Served Per Minute',
+                        data: Object.values(data.throughput_per_minute),
+                        backgroundColor: 'rgba(52, 152, 219, 0.5)',
+                        borderColor: 'rgba(52, 152, 219, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: chartOptions
+            });
+
+            const cumulativeCtx = document.getElementById('cumulative-chart').getContext('2d');
+            if (cumulativeChart) {
+                cumulativeChart.destroy();
+            }
+            cumulativeChart = new Chart(cumulativeCtx, {
+                type: 'line',
+                data: {
+                    labels: data.timeline_labels,
+                    datasets: [
+                        {
+                            label: 'Cumulative Thaals Out',
+                            data: data.cumulative_out_data,
+                            borderColor: 'rgba(46, 204, 113, 1)',
+                            backgroundColor: 'rgba(46, 204, 113, 0.2)',
+                            fill: true,
+                            tension: 0.1
+                        },
+                        {
+                            label: 'Cumulative Thaals In',
+                            data: data.cumulative_in_data,
+                            borderColor: 'rgba(231, 76, 60, 1)',
+                            backgroundColor: 'rgba(231, 76, 60, 0.2)',
+                            fill: true,
+                            tension: 0.1
+                        }
+                    ]
+                },
+                options: chartOptions
+            });
+        }
+
+
+        function updateDashboard(data) {
+            currentChartData = data;
+
+            if (data.message) {
+                 document.getElementById('dashboard-content').style.display = 'none';
+                 document.getElementById('no-data-message').style.display = 'block';
+            } else {
                 document.getElementById('total-out').textContent = data.total_thaals_out;
                 document.getElementById('total-in').textContent = data.total_thaals_in;
-                document.getElementById('total-duration').innerHTML = `${data.total_duration_minutes} <span style="color:#bdc3c7 !important; font-size:0.9em !important; font-weight:normal !important;">mins</span>`;
+                document.getElementById('total-duration').innerHTML = `${data.total_duration_minutes} <span style="color:#bdc3c7; font-size:0.9em; font-weight:normal;">mins</span>`;
                 document.getElementById('expected-thaals').textContent = data.total_expected;
-                document.getElementById('serving-duration').innerHTML = `${data.serving_duration} <span style="color:#bdc3c7 !important; font-size:0.9em !important; font-weight:normal !important;">mins</span>`;
-                document.getElementById('returning-duration').innerHTML = `${data.returning_duration} <span style="color:#bdc3c7 !important; font-size:0.9em !important; font-weight:normal !important;">mins</span>`;
-                document.getElementById('full-cycle-duration').innerHTML = `${data.full_cycle_duration} <span style="color:#bdc3c7 !important; font-size:0.9em !important; font-weight:normal !important;">mins</span>`;
-                document.getElementById('discrepancy-rate').innerHTML = `${data.discrepancy_rate} <br><small style="color:#bdc3c7 !important; font-size:0.9em !important; font-weight:normal !important;">(${data.discrepancy_count} thaals)</small>`;
-
-
-                const chartOptions = {
-                    scales: {
-                        y: { beginAtZero: true, ticks: { color: '#ecf0f1' }, grid: { color: 'rgba(236, 240, 241, 0.1)' } },
-                        x: { ticks: { color: '#ecf0f1' }, grid: { color: 'rgba(236, 240, 241, 0.1)' } }
-                    },
-                    plugins: { 
-                        legend: { labels: { color: '#ecf0f1' } }
-                    },
-                    maintainAspectRatio: true 
-                };
+                document.getElementById('serving-duration').innerHTML = `${data.serving_duration} <span style="color:#bdc3c7; font-size:0.9em; font-weight:normal;">mins</span>`;
+                document.getElementById('returning-duration').innerHTML = `${data.returning_duration} <span style="color:#bdc3c7; font-size:0.9em; font-weight:normal;">mins</span>`;
+                document.getElementById('full-cycle-duration').innerHTML = `${data.full_cycle_duration} <span style="color:#bdc3c7; font-size:0.9em; font-weight:normal;">mins</span>`;
+                document.getElementById('discrepancy-rate').innerHTML = `${data.discrepancy_rate} <br><small style="color:#bdc3c7; font-size:0.9em; font-weight:normal;">(${data.discrepancy_count} thaals)</small>`;
                 
-                const throughputCtx = document.getElementById('throughput-chart').getContext('2d');
-                if (throughputChart) {
-                    throughputChart.destroy();
-                }
-                throughputChart = new Chart(throughputCtx, {
-                    type: 'bar',
-                    data: {
-                        labels: Object.keys(data.throughput_per_minute),
-                        datasets: [{
-                            label: 'Thaals Served Per Minute',
-                            data: Object.values(data.throughput_per_minute),
-                            backgroundColor: 'rgba(52, 152, 219, 0.5)',
-                            borderColor: 'rgba(52, 152, 219, 1)',
-                            borderWidth: 1
-                        }]
-                    },
-                    options: chartOptions
-                });
-
-                const cumulativeCtx = document.getElementById('cumulative-chart').getContext('2d');
-                if (cumulativeChart) {
-                    cumulativeChart.destroy();
-                }
-                cumulativeChart = new Chart(cumulativeCtx, {
-                    type: 'line',
-                    data: {
-                        labels: data.timeline_labels,
-                        datasets: [
-                            {
-                                label: 'Cumulative Thaals Out',
-                                data: data.cumulative_out_data,
-                                borderColor: 'rgba(46, 204, 113, 1)',
-                                backgroundColor: 'rgba(46, 204, 113, 0.2)',
-                                fill: true,
-                                tension: 0.1
-                            },
-                            {
-                                label: 'Cumulative Thaals In',
-                                data: data.cumulative_in_data,
-                                borderColor: 'rgba(231, 76, 60, 1)',
-                                backgroundColor: 'rgba(231, 76, 60, 0.2)',
-                                fill: true,
-                                tension: 0.1
-                            }
-                        ]
-                    },
-                    options: chartOptions
-                });
+                drawCharts(data);
             }
         }
 
@@ -260,6 +290,16 @@
 
             datePicker.addEventListener('change', () => {
                 fetchDataForDate(datePicker.value);
+            });
+
+            let resizeTimer;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(() => {
+                    if (currentChartData) {
+                       drawCharts(currentChartData);
+                    }
+                }, 250);
             });
         });
     </script>
