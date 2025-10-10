@@ -55,8 +55,8 @@
         }
         .metrics {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); /* Adjusted for more cards */
-            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); /* Adjusted for more cards */
+            gap: 15px;
             margin-bottom: 30px;
         }
         .metric-card {
@@ -68,11 +68,11 @@
         .metric-card h2 {
             margin: 0 0 10px;
             color: #bdc3c7;
-            font-size: 1em;
+            font-size: 0.9em;
         }
         .metric-card p {
             margin: 0;
-            font-size: 2em;
+            font-size: 1.8em;
             font-weight: bold;
             color: #3498db;
         }
@@ -119,10 +119,10 @@
                     <p id="expected-thaals">--</p>
                 </div>
                 <div class="metric-card">
-                    <h2>Service (Mins)</h2>
+                    <!-- FIX: Update card title -->
+                    <h2>Service Duration</h2>
                     <p id="total-duration">--</p>
                 </div>
-                <!-- FIX: Added new metric cards for durations -->
                 <div class="metric-card">
                     <h2>Serving Duration</h2>
                     <p id="serving-duration">--</p>
@@ -134,6 +134,10 @@
                  <div class="metric-card">
                     <h2>Full Cycle</h2>
                     <p id="full-cycle-duration">--</p>
+                </div>
+                <div class="metric-card">
+                    <h2>Discrepancy Rate</h2>
+                    <p id="discrepancy-rate">--</p>
                 </div>
             </div>
     
@@ -169,13 +173,12 @@
 
                 document.getElementById('total-out').textContent = data.total_thaals_out;
                 document.getElementById('total-in').textContent = data.total_thaals_in;
-                document.getElementById('total-duration').textContent = data.total_duration_minutes;
+                document.getElementById('total-duration').innerHTML = `${data.total_duration_minutes} <span style="color:#bdc3c7 !important; font-size:0.9em !important; font-weight:normal !important;">mins</span>`;
                 document.getElementById('expected-thaals').textContent = data.total_expected;
-
-                // FIX: Update new duration metric cards
-                document.getElementById('serving-duration').textContent = data.serving_duration;
-                document.getElementById('returning-duration').textContent = data.returning_duration;
-                document.getElementById('full-cycle-duration').textContent = data.full_cycle_duration;
+                document.getElementById('serving-duration').innerHTML = `${data.serving_duration} <span style="color:#bdc3c7 !important; font-size:0.9em !important; font-weight:normal !important;">mins</span>`;
+                document.getElementById('returning-duration').innerHTML = `${data.returning_duration} <span style="color:#bdc3c7 !important; font-size:0.9em !important; font-weight:normal !important;">mins</span>`;
+                document.getElementById('full-cycle-duration').innerHTML = `${data.full_cycle_duration} <span style="color:#bdc3c7 !important; font-size:0.9em !important; font-weight:normal !important;">mins</span>`;
+                document.getElementById('discrepancy-rate').innerHTML = `${data.discrepancy_rate} <br><small style="color:#bdc3c7 !important; font-size:0.9em !important; font-weight:normal !important;">(${data.discrepancy_count} thaals)</small>`;
 
 
                 const chartOptions = {

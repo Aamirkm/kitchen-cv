@@ -131,6 +131,13 @@ def dashboard_data():
             end_time = datetime.fromisoformat(end_time_str)
             total_duration_minutes += (end_time - start_time).total_seconds() / 60
 
+    # --- NEW: Calculate Discrepancy Rate ---
+    discrepancy_count = abs(total_out - total_in)
+    total_activity = total_out + total_in
+    discrepancy_rate = 0
+    if total_activity > 0:
+        discrepancy_rate = (discrepancy_count / total_activity) * 100
+
     timeline_labels, cumulative_out, cumulative_in = database.get_timeseries_data(session_ids)
     throughput_per_minute = database.get_throughput_per_minute(session_ids)
     serving_duration, returning_duration, full_cycle_duration = database.get_duration_metrics(session_ids)
@@ -144,6 +151,9 @@ def dashboard_data():
         'serving_duration': serving_duration,
         'returning_duration': returning_duration,
         'full_cycle_duration': full_cycle_duration,
+
+        'discrepancy_rate': f"{discrepancy_rate:.2f}%",
+        'discrepancy_count': discrepancy_count,
 
         'timeline_labels': timeline_labels,
         'cumulative_out_data': cumulative_out,
