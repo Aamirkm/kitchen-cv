@@ -164,7 +164,7 @@ def get_timeseries_data(session_ids):
     start_time = local_events[0][0]
     end_time = local_events[-1][0]
     
-    start_time -= timedelta(minutes=start_time.minute % 5,
+    start_time -= timedelta(minutes=start_time.minute % 1,
                             seconds=start_time.second,
                             microseconds=start_time.microsecond)
 
@@ -177,10 +177,10 @@ def get_timeseries_data(session_ids):
     event_index = 0
 
     current_time = start_time
-    while current_time <= end_time + timedelta(minutes=5):
+    while current_time <= end_time + timedelta(minutes=1):
         labels.append(current_time.strftime('%H:%M'))
         
-        next_interval_time = current_time + timedelta(minutes=5)
+        next_interval_time = current_time + timedelta(minutes=1)
         while event_index < len(local_events) and local_events[event_index][0] < next_interval_time:
             if local_events[event_index][1] == 'THAAL_OUT':
                 count_out += 1
