@@ -74,8 +74,8 @@
         }
         .btn-start { background-color: #27ae60; }
         .btn-stop { background-color: #c0392b; }
-        .btn-toggle-stream { background-color: #f39c12; }
-        .btn-dashboard { background-color: #8e44ad; }
+        .btn-toggle-stream { background-color: #8e44ad; }
+        .btn-dashboard { background-color: #d49734; }
         .btn:disabled {
             background-color: #7f8c8d;
             cursor: not-allowed;
@@ -100,11 +100,11 @@
             <p id="live-thaal-in">0</p>
         </div>
         <div class="metric-card">
-            <h2>Expected</h2>
+            <h2>Expected Thaals</h2>
             <p id="live-expected">N/A</p>
         </div>
         <div class="metric-card">
-            <h2>Service Time (Min)</h2>
+            <h2>Service Time</h2>
             <p id="live-duration">0</p>
         </div>
     </div>
@@ -192,7 +192,7 @@
                     liveThaalOut.textContent = data.thaal_out;
                     liveThaalIn.textContent = data.thaal_in;
                     liveExpected.textContent = data.expected_thaals || 'N/A';
-                    liveDuration.textContent = data.service_duration_minutes;
+                    liveDuration.textContent = data.service_duration_minutes + ' mins';
                 })
                 .catch(error => console.error('Error fetching status:', error));
         }
