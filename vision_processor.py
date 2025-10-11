@@ -33,7 +33,7 @@ class VisionProcessor:
         self.FRAME_WIDTH = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.FRAME_HEIGHT = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         self.LINE_OUT_POSITION = self.FRAME_WIDTH // 3
-        self.LINE_IN_POSITION = (self.FRAME_WIDTH // 3) * 2
+        self.LINE_IN_POSITION = 750 #(self.FRAME_WIDTH // 3) * 2
 
         # --- Threading ---
         self.frame_lock = threading.Lock()
@@ -65,7 +65,7 @@ class VisionProcessor:
 
                 if self.auto_stop_timer:
                     self.auto_stop_timer.cancel()
-                self.auto_stop_timer = threading.Timer(10800, self.stop_service) 
+                self.auto_stop_timer = threading.Timer(3 * 60 * 60, self.stop_service) 
                 self.auto_stop_timer.start()
 
     def stop_service(self):
@@ -154,7 +154,7 @@ class VisionProcessor:
             
             # --- Drawing on the frame ---
             # Draw lines regardless of service state
-            cv2.line(processed_frame, (self.LINE_OUT_POSITION, 0), (self.LINE_OUT_POSITION, self.FRAME_HEIGHT), (0, 255, 0), 2)
+            cv2.line(processed_frame, (500, 0), (250, self.FRAME_HEIGHT), (0, 255, 0), 2)
             cv2.line(processed_frame, (self.LINE_IN_POSITION, 0), (self.LINE_IN_POSITION, self.FRAME_HEIGHT), (0, 0, 255), 2)
             
             # THE COUNT TEXT IS NO LONGER DRAWN HERE
